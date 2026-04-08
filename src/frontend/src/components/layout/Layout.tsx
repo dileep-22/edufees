@@ -1,7 +1,13 @@
 import { Toaster } from "@/components/ui/sonner";
 import { useInternetIdentity } from "@caffeineai/core-infrastructure";
 import { useRouter } from "@tanstack/react-router";
-import { Bell, ChevronDown, LogOut, UserCircle } from "lucide-react";
+import {
+  Bell,
+  ChevronDown,
+  GraduationCap,
+  LogOut,
+  UserCircle,
+} from "lucide-react";
 import { useRef, useState } from "react";
 import { Sidebar } from "./Sidebar";
 
@@ -37,21 +43,35 @@ export function Layout({ children }: LayoutProps) {
 
       {/* Main content area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Top bar */}
+        {/* Top bar — card-institutional treatment */}
         <header
-          className="h-14 shrink-0 bg-card border-b border-border flex items-center justify-between px-6 shadow-sm"
+          className="h-14 shrink-0 bg-card border-b border-border flex items-center justify-between px-6 shadow-subtle"
+          style={{ borderTop: "2px solid oklch(var(--primary))" }}
           data-ocid="app-header"
         >
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-foreground">
-              Westfield Academy
-            </span>
-            <span className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded-md">
-              Admin
-            </span>
+          {/* Left — brand + institution */}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-md bg-primary flex items-center justify-center">
+                <GraduationCap className="w-3.5 h-3.5 text-primary-foreground" />
+              </div>
+              <span className="text-sm font-display font-semibold text-foreground">
+                EduFees
+              </span>
+            </div>
+            <span className="hidden sm:block text-border">|</span>
+            <div className="hidden sm:flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">
+                Westfield Academy
+              </span>
+              <span className="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-md font-medium">
+                Admin
+              </span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          {/* Right — actions + user menu */}
+          <div className="flex items-center gap-2">
             <button
               type="button"
               className="relative p-1.5 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
@@ -66,15 +86,17 @@ export function Layout({ children }: LayoutProps) {
             <div className="relative" ref={menuRef}>
               <button
                 type="button"
-                className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-lg hover:bg-secondary transition-colors text-sm"
+                className="flex items-center gap-2 pl-2 pr-2.5 py-1.5 rounded-lg hover:bg-secondary transition-colors text-sm border border-transparent hover:border-border"
                 data-ocid="header-user-menu"
                 onClick={() => setMenuOpen((prev) => !prev)}
                 aria-expanded={menuOpen}
                 aria-haspopup="menu"
               >
-                <UserCircle className="w-6 h-6 text-muted-foreground" />
+                <div className="w-6 h-6 rounded-full bg-primary/15 flex items-center justify-center">
+                  <UserCircle className="w-4 h-4 text-primary" />
+                </div>
                 <span
-                  className="font-medium text-foreground text-sm hidden sm:block max-w-[120px] truncate"
+                  className="font-medium text-foreground text-xs hidden sm:block max-w-[120px] truncate"
                   title={identity?.getPrincipal().toText()}
                 >
                   {principalText}
@@ -93,28 +115,43 @@ export function Layout({ children }: LayoutProps) {
                   />
                   {/* Dropdown */}
                   <div
-                    className="absolute right-0 top-full mt-1.5 z-20 w-56 bg-card border border-border rounded-xl shadow-lg py-1 overflow-hidden"
+                    className="absolute right-0 top-full mt-1.5 z-20 w-64 bg-card border border-border rounded-xl shadow-elevated py-1 overflow-hidden"
                     role="menu"
                     data-ocid="user-menu-dropdown"
                   >
-                    {/* Principal display */}
-                    <div className="px-3 py-2.5 border-b border-border">
-                      <p className="text-xs text-muted-foreground mb-0.5">
-                        Principal ID
-                      </p>
-                      <p
-                        className="text-xs font-mono text-foreground truncate"
-                        title={identity?.getPrincipal().toText()}
-                      >
-                        {identity?.getPrincipal().toText() ?? "—"}
-                      </p>
+                    {/* Identity header */}
+                    <div className="px-3 pt-3 pb-2.5 border-b border-border">
+                      <div className="flex items-center gap-2.5 mb-2">
+                        <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
+                          <UserCircle className="w-5 h-5 text-primary" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold text-foreground">
+                            Administrator
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Internet Identity
+                          </p>
+                        </div>
+                      </div>
+                      <div className="bg-secondary rounded-md px-2.5 py-1.5">
+                        <p className="text-xs text-muted-foreground mb-0.5 font-medium">
+                          Principal ID
+                        </p>
+                        <p
+                          className="text-xs font-mono text-foreground truncate"
+                          title={identity?.getPrincipal().toText()}
+                        >
+                          {identity?.getPrincipal().toText() ?? "—"}
+                        </p>
+                      </div>
                     </div>
 
                     {/* Logout */}
                     <button
                       type="button"
                       role="menuitem"
-                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-destructive hover:bg-destructive/8 transition-colors"
                       onClick={handleLogout}
                       data-ocid="logout-btn"
                     >

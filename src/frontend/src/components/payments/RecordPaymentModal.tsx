@@ -17,11 +17,11 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useFeeStructures } from "@/hooks/use-fee-structures";
-import { useRecordPayment } from "@/hooks/use-payments";
+import { useCheckReceiptExists, useRecordPayment } from "@/hooks/use-payments";
 import { useStudents } from "@/hooks/use-students";
 import { PaymentMethod } from "@/types";
-import { Loader2, Receipt } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, Loader2, Receipt } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 interface RecordPaymentModalProps {
@@ -49,6 +49,7 @@ export function RecordPaymentModal({
   const { data: students } = useStudents();
   const { data: feeStructures } = useFeeStructures();
   const { mutateAsync: recordPayment, isPending } = useRecordPayment();
+  const checkReceiptExists = useCheckReceiptExists();
 
   const [studentSearch, setStudentSearch] = useState("");
   const [studentId, setStudentId] = useState<string>(
@@ -65,6 +66,11 @@ export function RecordPaymentModal({
   const [notes, setNotes] = useState("");
   const [receiptNumber, setReceiptNumber] = useState(generateReceiptNumber);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [receiptDuplicate, setReceiptDuplicate] = useState(false);
+  const [receiptChecking, setReceiptChecking] = useState(false);
+
+  // Debounce timer ref for receipt check
+  const receiptCheckTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Reset form when opened
   useEffect(() => {
@@ -80,8 +86,46 @@ export function RecordPaymentModal({
       setReceiptNumber(generateReceiptNumber());
       setErrors({});
       setStudentSearch("");
+      setReceiptDuplicate(false);
+      setReceiptChecking(false);
     }
   }, [open, prefillStudentId, prefillFeeStructureId]);
+
+  // Debounced receipt check on value change
+  function handleReceiptChange(value: string) {
+    setReceiptNumber(value);
+    setErrors((errs) => ({ ...errs, receiptNumber: "" }));
+    setReceiptDuplicate(false);
+
+    if (receiptCheckTimer.current) clearTimeout(receiptCheckTimer.current);
+    if (!value.trim()) return;
+
+    setReceiptChecking(true);
+    receiptCheckTimer.current = setTimeout(async () => {
+      try {
+        const exists = await checkReceiptExists(value.trim());
+        setReceiptDuplicate(exists);
+      } finally {
+        setReceiptChecking(false);
+      }
+    }, 500);
+  }
+
+  // Also check on blur for immediate feedback
+  async function handleReceiptBlur() {
+    if (!receiptNumber.trim()) return;
+    if (receiptCheckTimer.current) {
+      clearTimeout(receiptCheckTimer.current);
+      receiptCheckTimer.current = null;
+    }
+    setReceiptChecking(true);
+    try {
+      const exists = await checkReceiptExists(receiptNumber.trim());
+      setReceiptDuplicate(exists);
+    } finally {
+      setReceiptChecking(false);
+    }
+  }
 
   const filteredStudents = useMemo(() => {
     if (!students) return [];
@@ -106,6 +150,8 @@ export function RecordPaymentModal({
     return errs;
   }
 
+  const isSubmitDisabled = isPending || receiptChecking || receiptDuplicate;
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const errs = validate();
@@ -113,6 +159,7 @@ export function RecordPaymentModal({
       setErrors(errs);
       return;
     }
+    if (receiptDuplicate) return;
 
     try {
       const dateTs = BigInt(new Date(date).getTime()) * 1_000_000n;
@@ -130,10 +177,9 @@ export function RecordPaymentModal({
         description: `Receipt ${receiptNumber} issued`,
       });
       onOpenChange(false);
-    } catch {
-      toast.error("Failed to record payment", {
-        description: "Please try again.",
-      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Please try again.";
+      toast.error("Failed to record payment", { description: message });
     }
   }
 
@@ -305,21 +351,40 @@ export function RecordPaymentModal({
               <Label htmlFor="receipt-number" className="text-xs font-semibold">
                 Receipt Number
               </Label>
-              <Input
-                id="receipt-number"
-                value={receiptNumber}
-                onChange={(e) => {
-                  setReceiptNumber(e.target.value);
-                  setErrors((errs) => ({ ...errs, receiptNumber: "" }));
-                }}
-                className="text-sm font-mono"
-                aria-invalid={!!errors.receiptNumber}
-                data-ocid="receipt-number-input"
-              />
+              <div className="relative">
+                <Input
+                  id="receipt-number"
+                  value={receiptNumber}
+                  onChange={(e) => handleReceiptChange(e.target.value)}
+                  onBlur={handleReceiptBlur}
+                  className={`text-sm font-mono pr-7 ${receiptDuplicate ? "border-amber-400 focus-visible:ring-amber-300" : ""}`}
+                  aria-invalid={!!errors.receiptNumber || receiptDuplicate}
+                  data-ocid="receipt-number-input"
+                />
+                {receiptChecking && (
+                  <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 animate-spin text-muted-foreground" />
+                )}
+                {!receiptChecking && receiptDuplicate && (
+                  <AlertTriangle className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-amber-500" />
+                )}
+              </div>
               {errors.receiptNumber && (
                 <p className="text-xs text-destructive">
                   {errors.receiptNumber}
                 </p>
+              )}
+              {receiptDuplicate && !errors.receiptNumber && (
+                <div
+                  className="flex items-start gap-1.5 mt-1 rounded-md bg-amber-50 border border-amber-200 px-2.5 py-2"
+                  role="alert"
+                  data-ocid="receipt-duplicate-warning"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-800 leading-snug">
+                    This receipt number has already been used. Please enter a
+                    unique receipt number.
+                  </p>
+                </div>
               )}
             </div>
           </div>
@@ -354,7 +419,7 @@ export function RecordPaymentModal({
             </Button>
             <Button
               type="submit"
-              disabled={isPending}
+              disabled={isSubmitDisabled}
               className="gap-1.5"
               data-ocid="submit-payment-btn"
             >
@@ -362,6 +427,11 @@ export function RecordPaymentModal({
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
                   Recording…
+                </>
+              ) : receiptChecking ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Checking…
                 </>
               ) : (
                 <>

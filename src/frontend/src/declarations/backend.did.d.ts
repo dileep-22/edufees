@@ -15,13 +15,28 @@ export interface AgingBucket {
   'totalAmount' : bigint,
   'bucket' : string,
 }
+export interface AgingBucketDetail {
+  'daysOverdue' : bigint,
+  'feeStructureName' : string,
+  'studentId' : string,
+  'studentName' : string,
+  'amountPaid' : bigint,
+  'amountDue' : bigint,
+}
 export type AssignmentId = bigint;
 export interface CollectionSummary {
   'totalOverdue' : bigint,
   'totalCollected' : bigint,
   'totalOutstanding' : bigint,
   'totalWaived' : bigint,
+  'totalOutstandingWithPenalty' : bigint,
   'paymentCount' : bigint,
+}
+export interface CollectionTrends {
+  'previousPeriodTotal' : bigint,
+  'previousPeriodCount' : bigint,
+  'currentPeriodTotal' : bigint,
+  'currentPeriodCount' : bigint,
 }
 export interface CreateFeeStructureInput {
   'endDate' : Timestamp,
@@ -72,6 +87,16 @@ export interface FeeStructure {
   'startDate' : Timestamp,
 }
 export type FeeStructureId = bigint;
+export interface ImportResult {
+  'imported' : bigint,
+  'errors' : Array<ImportRowError>,
+}
+export interface ImportRowError {
+  'row' : bigint,
+  'field' : string,
+  'value' : string,
+  'message' : string,
+}
 export type LatePenalty = { 'fixed' : bigint } |
   { 'percentage' : bigint };
 export interface Payment {
@@ -101,6 +126,8 @@ export type PaymentStatus = { 'pending' : null } |
   { 'overdue' : null } |
   { 'waived' : null } |
   { 'partial' : null };
+export type RecordPaymentError = { 'DuplicateReceipt' : null } |
+  { 'NotFound' : null };
 export interface RecordPaymentInput {
   'method' : PaymentMethod,
   'studentId' : StudentId,
@@ -125,9 +152,11 @@ export interface StudentBalance {
   'studentId' : StudentId,
   'feeStructureId' : FeeStructureId,
   'studentName' : string,
+  'penaltyAmount' : bigint,
   'dueDate' : Timestamp,
   'totalAmount' : bigint,
   'outstandingAmount' : bigint,
+  'totalWithPenalty' : bigint,
   'paidAmount' : bigint,
 }
 export type StudentId = bigint;
@@ -164,16 +193,19 @@ export interface _SERVICE {
     [StudentId, FeeStructureId],
     FeeAssignment
   >,
-  'bulkImportStudents' : ActorMethod<[Array<CsvStudentRow>], Array<Student>>,
+  'bulkImportStudents' : ActorMethod<[Array<CsvStudentRow>], ImportResult>,
+  'checkReceiptExists' : ActorMethod<[string], boolean>,
   'createFeeStructure' : ActorMethod<[CreateFeeStructureInput], FeeStructure>,
   'createStudent' : ActorMethod<[CreateStudentInput], Student>,
   'deleteFeeStructure' : ActorMethod<[FeeStructureId], boolean>,
   'deleteStudent' : ActorMethod<[StudentId], boolean>,
   'duplicateFeeStructure' : ActorMethod<[FeeStructureId], [] | [FeeStructure]>,
   'getAgingReport' : ActorMethod<[], Array<AgingBucket>>,
+  'getAgingReportDetail' : ActorMethod<[bigint], Array<AgingBucketDetail>>,
   'getAllBalances' : ActorMethod<[], Array<StudentBalance>>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getCollectionSummary' : ActorMethod<[], CollectionSummary>,
+  'getCollectionTrends' : ActorMethod<[], CollectionTrends>,
   'getFeeStructure' : ActorMethod<[FeeStructureId], [] | [FeeStructure]>,
   'getFeeStructureBalances' : ActorMethod<
     [FeeStructureId],
@@ -190,7 +222,11 @@ export interface _SERVICE {
   'listFeeStructures' : ActorMethod<[], Array<FeeStructure>>,
   'listStudents' : ActorMethod<[], Array<Student>>,
   'listStudentsByGroup' : ActorMethod<[string], Array<Student>>,
-  'recordPayment' : ActorMethod<[RecordPaymentInput], Payment>,
+  'recordPayment' : ActorMethod<
+    [RecordPaymentInput],
+    { 'ok' : Payment } |
+      { 'err' : RecordPaymentError }
+  >,
   'unenrollStudent' : ActorMethod<[StudentId, FeeStructureId], boolean>,
   'updateFeeStructure' : ActorMethod<
     [UpdateFeeStructureInput],

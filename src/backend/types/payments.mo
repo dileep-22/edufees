@@ -38,6 +38,11 @@ module {
     notes : Text;
   };
 
+  public type RecordPaymentError = {
+    #DuplicateReceipt;
+    #NotFound;
+  };
+
   public type FeeAssignment = {
     id : Common.AssignmentId;
     studentId : Common.StudentId;
@@ -56,6 +61,8 @@ module {
     totalAmount : Nat;
     paidAmount : Nat;
     outstandingAmount : Nat;
+    penaltyAmount : Nat; // late penalty applied, 0 if none
+    totalWithPenalty : Nat; // outstandingAmount + penaltyAmount
     status : PaymentStatus;
     dueDate : Common.Timestamp;
   };
@@ -63,9 +70,17 @@ module {
   public type CollectionSummary = {
     totalCollected : Nat;
     totalOutstanding : Nat;
+    totalOutstandingWithPenalty : Nat; // includes applicable late penalties
     totalOverdue : Nat;
     totalWaived : Nat;
     paymentCount : Nat;
+  };
+
+  public type CollectionTrends = {
+    currentPeriodTotal : Nat;
+    previousPeriodTotal : Nat;
+    currentPeriodCount : Nat;
+    previousPeriodCount : Nat;
   };
 
   public type PaymentMethodBreakdown = {
@@ -79,5 +94,14 @@ module {
     bucket : Text; // "0-30", "30-60", "60+"
     count : Nat;
     totalAmount : Nat;
+  };
+
+  public type AgingBucketDetail = {
+    studentName : Text;
+    studentId : Text;
+    feeStructureName : Text;
+    daysOverdue : Nat;
+    amountDue : Nat;
+    amountPaid : Nat;
   };
 };

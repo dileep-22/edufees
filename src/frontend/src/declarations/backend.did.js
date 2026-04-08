@@ -39,14 +39,15 @@ export const CsvStudentRow = IDL.Record({
   'email' : IDL.Text,
   'group' : IDL.Text,
 });
-export const Student = IDL.Record({
-  'id' : StudentId,
-  'studentId' : IDL.Text,
-  'name' : IDL.Text,
-  'createdAt' : Timestamp,
-  'email' : IDL.Text,
-  'updatedAt' : Timestamp,
-  'group' : IDL.Text,
+export const ImportRowError = IDL.Record({
+  'row' : IDL.Nat,
+  'field' : IDL.Text,
+  'value' : IDL.Text,
+  'message' : IDL.Text,
+});
+export const ImportResult = IDL.Record({
+  'imported' : IDL.Nat,
+  'errors' : IDL.Vec(ImportRowError),
 });
 export const FeePeriod = IDL.Variant({
   'semester' : IDL.Null,
@@ -87,10 +88,27 @@ export const CreateStudentInput = IDL.Record({
   'email' : IDL.Text,
   'group' : IDL.Text,
 });
+export const Student = IDL.Record({
+  'id' : StudentId,
+  'studentId' : IDL.Text,
+  'name' : IDL.Text,
+  'createdAt' : Timestamp,
+  'email' : IDL.Text,
+  'updatedAt' : Timestamp,
+  'group' : IDL.Text,
+});
 export const AgingBucket = IDL.Record({
   'count' : IDL.Nat,
   'totalAmount' : IDL.Nat,
   'bucket' : IDL.Text,
+});
+export const AgingBucketDetail = IDL.Record({
+  'daysOverdue' : IDL.Nat,
+  'feeStructureName' : IDL.Text,
+  'studentId' : IDL.Text,
+  'studentName' : IDL.Text,
+  'amountPaid' : IDL.Nat,
+  'amountDue' : IDL.Nat,
 });
 export const StudentBalance = IDL.Record({
   'status' : PaymentStatus,
@@ -98,9 +116,11 @@ export const StudentBalance = IDL.Record({
   'studentId' : StudentId,
   'feeStructureId' : FeeStructureId,
   'studentName' : IDL.Text,
+  'penaltyAmount' : IDL.Nat,
   'dueDate' : Timestamp,
   'totalAmount' : IDL.Nat,
   'outstandingAmount' : IDL.Nat,
+  'totalWithPenalty' : IDL.Nat,
   'paidAmount' : IDL.Nat,
 });
 export const CollectionSummary = IDL.Record({
@@ -108,7 +128,14 @@ export const CollectionSummary = IDL.Record({
   'totalCollected' : IDL.Nat,
   'totalOutstanding' : IDL.Nat,
   'totalWaived' : IDL.Nat,
+  'totalOutstandingWithPenalty' : IDL.Nat,
   'paymentCount' : IDL.Nat,
+});
+export const CollectionTrends = IDL.Record({
+  'previousPeriodTotal' : IDL.Nat,
+  'previousPeriodCount' : IDL.Nat,
+  'currentPeriodTotal' : IDL.Nat,
+  'currentPeriodCount' : IDL.Nat,
 });
 export const PaymentMethodBreakdown = IDL.Record({
   'cash' : IDL.Nat,
@@ -143,6 +170,10 @@ export const RecordPaymentInput = IDL.Record({
   'amount' : IDL.Nat,
   'receiptNumber' : IDL.Text,
 });
+export const RecordPaymentError = IDL.Variant({
+  'DuplicateReceipt' : IDL.Null,
+  'NotFound' : IDL.Null,
+});
 export const UpdateFeeStructureInput = IDL.Record({
   'id' : FeeStructureId,
   'endDate' : Timestamp,
@@ -175,11 +206,8 @@ export const idlService = IDL.Service({
       [FeeAssignment],
       [],
     ),
-  'bulkImportStudents' : IDL.Func(
-      [IDL.Vec(CsvStudentRow)],
-      [IDL.Vec(Student)],
-      [],
-    ),
+  'bulkImportStudents' : IDL.Func([IDL.Vec(CsvStudentRow)], [ImportResult], []),
+  'checkReceiptExists' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
   'createFeeStructure' : IDL.Func(
       [CreateFeeStructureInput],
       [FeeStructure],
@@ -194,9 +222,15 @@ export const idlService = IDL.Service({
       [],
     ),
   'getAgingReport' : IDL.Func([], [IDL.Vec(AgingBucket)], []),
+  'getAgingReportDetail' : IDL.Func(
+      [IDL.Nat],
+      [IDL.Vec(AgingBucketDetail)],
+      [],
+    ),
   'getAllBalances' : IDL.Func([], [IDL.Vec(StudentBalance)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
   'getCollectionSummary' : IDL.Func([], [CollectionSummary], ['query']),
+  'getCollectionTrends' : IDL.Func([], [CollectionTrends], ['query']),
   'getFeeStructure' : IDL.Func(
       [FeeStructureId],
       [IDL.Opt(FeeStructure)],
@@ -227,7 +261,11 @@ export const idlService = IDL.Service({
   'listFeeStructures' : IDL.Func([], [IDL.Vec(FeeStructure)], ['query']),
   'listStudents' : IDL.Func([], [IDL.Vec(Student)], ['query']),
   'listStudentsByGroup' : IDL.Func([IDL.Text], [IDL.Vec(Student)], ['query']),
-  'recordPayment' : IDL.Func([RecordPaymentInput], [Payment], []),
+  'recordPayment' : IDL.Func(
+      [RecordPaymentInput],
+      [IDL.Variant({ 'ok' : Payment, 'err' : RecordPaymentError })],
+      [],
+    ),
   'unenrollStudent' : IDL.Func([StudentId, FeeStructureId], [IDL.Bool], []),
   'updateFeeStructure' : IDL.Func(
       [UpdateFeeStructureInput],
@@ -277,14 +315,15 @@ export const idlFactory = ({ IDL }) => {
     'email' : IDL.Text,
     'group' : IDL.Text,
   });
-  const Student = IDL.Record({
-    'id' : StudentId,
-    'studentId' : IDL.Text,
-    'name' : IDL.Text,
-    'createdAt' : Timestamp,
-    'email' : IDL.Text,
-    'updatedAt' : Timestamp,
-    'group' : IDL.Text,
+  const ImportRowError = IDL.Record({
+    'row' : IDL.Nat,
+    'field' : IDL.Text,
+    'value' : IDL.Text,
+    'message' : IDL.Text,
+  });
+  const ImportResult = IDL.Record({
+    'imported' : IDL.Nat,
+    'errors' : IDL.Vec(ImportRowError),
   });
   const FeePeriod = IDL.Variant({
     'semester' : IDL.Null,
@@ -325,10 +364,27 @@ export const idlFactory = ({ IDL }) => {
     'email' : IDL.Text,
     'group' : IDL.Text,
   });
+  const Student = IDL.Record({
+    'id' : StudentId,
+    'studentId' : IDL.Text,
+    'name' : IDL.Text,
+    'createdAt' : Timestamp,
+    'email' : IDL.Text,
+    'updatedAt' : Timestamp,
+    'group' : IDL.Text,
+  });
   const AgingBucket = IDL.Record({
     'count' : IDL.Nat,
     'totalAmount' : IDL.Nat,
     'bucket' : IDL.Text,
+  });
+  const AgingBucketDetail = IDL.Record({
+    'daysOverdue' : IDL.Nat,
+    'feeStructureName' : IDL.Text,
+    'studentId' : IDL.Text,
+    'studentName' : IDL.Text,
+    'amountPaid' : IDL.Nat,
+    'amountDue' : IDL.Nat,
   });
   const StudentBalance = IDL.Record({
     'status' : PaymentStatus,
@@ -336,9 +392,11 @@ export const idlFactory = ({ IDL }) => {
     'studentId' : StudentId,
     'feeStructureId' : FeeStructureId,
     'studentName' : IDL.Text,
+    'penaltyAmount' : IDL.Nat,
     'dueDate' : Timestamp,
     'totalAmount' : IDL.Nat,
     'outstandingAmount' : IDL.Nat,
+    'totalWithPenalty' : IDL.Nat,
     'paidAmount' : IDL.Nat,
   });
   const CollectionSummary = IDL.Record({
@@ -346,7 +404,14 @@ export const idlFactory = ({ IDL }) => {
     'totalCollected' : IDL.Nat,
     'totalOutstanding' : IDL.Nat,
     'totalWaived' : IDL.Nat,
+    'totalOutstandingWithPenalty' : IDL.Nat,
     'paymentCount' : IDL.Nat,
+  });
+  const CollectionTrends = IDL.Record({
+    'previousPeriodTotal' : IDL.Nat,
+    'previousPeriodCount' : IDL.Nat,
+    'currentPeriodTotal' : IDL.Nat,
+    'currentPeriodCount' : IDL.Nat,
   });
   const PaymentMethodBreakdown = IDL.Record({
     'cash' : IDL.Nat,
@@ -380,6 +445,10 @@ export const idlFactory = ({ IDL }) => {
     'notes' : IDL.Text,
     'amount' : IDL.Nat,
     'receiptNumber' : IDL.Text,
+  });
+  const RecordPaymentError = IDL.Variant({
+    'DuplicateReceipt' : IDL.Null,
+    'NotFound' : IDL.Null,
   });
   const UpdateFeeStructureInput = IDL.Record({
     'id' : FeeStructureId,
@@ -415,9 +484,10 @@ export const idlFactory = ({ IDL }) => {
       ),
     'bulkImportStudents' : IDL.Func(
         [IDL.Vec(CsvStudentRow)],
-        [IDL.Vec(Student)],
+        [ImportResult],
         [],
       ),
+    'checkReceiptExists' : IDL.Func([IDL.Text], [IDL.Bool], ['query']),
     'createFeeStructure' : IDL.Func(
         [CreateFeeStructureInput],
         [FeeStructure],
@@ -432,9 +502,15 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'getAgingReport' : IDL.Func([], [IDL.Vec(AgingBucket)], []),
+    'getAgingReportDetail' : IDL.Func(
+        [IDL.Nat],
+        [IDL.Vec(AgingBucketDetail)],
+        [],
+      ),
     'getAllBalances' : IDL.Func([], [IDL.Vec(StudentBalance)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
     'getCollectionSummary' : IDL.Func([], [CollectionSummary], ['query']),
+    'getCollectionTrends' : IDL.Func([], [CollectionTrends], ['query']),
     'getFeeStructure' : IDL.Func(
         [FeeStructureId],
         [IDL.Opt(FeeStructure)],
@@ -465,7 +541,11 @@ export const idlFactory = ({ IDL }) => {
     'listFeeStructures' : IDL.Func([], [IDL.Vec(FeeStructure)], ['query']),
     'listStudents' : IDL.Func([], [IDL.Vec(Student)], ['query']),
     'listStudentsByGroup' : IDL.Func([IDL.Text], [IDL.Vec(Student)], ['query']),
-    'recordPayment' : IDL.Func([RecordPaymentInput], [Payment], []),
+    'recordPayment' : IDL.Func(
+        [RecordPaymentInput],
+        [IDL.Variant({ 'ok' : Payment, 'err' : RecordPaymentError })],
+        [],
+      ),
     'unenrollStudent' : IDL.Func([StudentId, FeeStructureId], [IDL.Bool], []),
     'updateFeeStructure' : IDL.Func(
         [UpdateFeeStructureInput],

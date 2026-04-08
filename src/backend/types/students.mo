@@ -32,4 +32,16 @@ module {
     email : Text;
     group : Text;
   };
+
+  public type ImportRowError = {
+    row : Nat;
+    field : Text;
+    value : Text;
+    message : Text;
+  };
+
+  public type ImportResult = {
+    imported : Nat;
+    errors : [ImportRowError];
+  };
 };

@@ -89,42 +89,25 @@ export class ExternalBlob {
         return this;
     }
 }
-export interface CreateFeeStructureInput {
-    endDate: Timestamp;
-    period: FeePeriod;
-    name: string;
-    latePenalty?: LatePenalty;
-    dueDate: Timestamp;
-    description: string;
-    amount: bigint;
-    startDate: Timestamp;
-}
 export type Timestamp = bigint;
-export interface RecordPaymentInput {
-    method: PaymentMethod;
-    studentId: StudentId;
-    feeStructureId: FeeStructureId;
-    date: Timestamp;
-    notes: string;
-    amount: bigint;
-    receiptNumber: string;
-}
 export interface StudentBalance {
     status: PaymentStatus;
     feeStructureName: string;
     studentId: StudentId;
     feeStructureId: FeeStructureId;
     studentName: string;
+    penaltyAmount: bigint;
     dueDate: Timestamp;
     totalAmount: bigint;
     outstandingAmount: bigint;
+    totalWithPenalty: bigint;
     paidAmount: bigint;
 }
-export interface PaymentMethodBreakdown {
-    cash: bigint;
-    check: bigint;
-    transfer: bigint;
-    online: bigint;
+export interface CsvStudentRow {
+    studentId: string;
+    name: string;
+    email: string;
+    group: string;
 }
 export interface UpdateFeeStructureInput {
     id: FeeStructureId;
@@ -137,25 +120,15 @@ export interface UpdateFeeStructureInput {
     amount: bigint;
     startDate: Timestamp;
 }
-export type FeeStructureId = bigint;
-export interface Payment {
-    id: PaymentId;
-    method: PaymentMethod;
-    studentId: StudentId;
-    feeStructureId: FeeStructureId;
-    date: Timestamp;
-    createdAt: Timestamp;
-    notes: string;
-    amount: bigint;
-    receiptNumber: string;
+export interface AgingBucket {
+    count: bigint;
+    totalAmount: bigint;
+    bucket: string;
 }
-export interface CsvStudentRow {
-    studentId: string;
-    name: string;
-    email: string;
-    group: string;
+export interface ImportResult {
+    imported: bigint;
+    errors: Array<ImportRowError>;
 }
-export type StudentId = bigint;
 export interface UpdateStudentInput {
     id: StudentId;
     studentId: string;
@@ -176,6 +149,53 @@ export interface FeeStructure {
     amount: bigint;
     startDate: Timestamp;
 }
+export interface ImportRowError {
+    row: bigint;
+    field: string;
+    value: string;
+    message: string;
+}
+export type AssignmentId = bigint;
+export interface CollectionTrends {
+    previousPeriodTotal: bigint;
+    previousPeriodCount: bigint;
+    currentPeriodTotal: bigint;
+    currentPeriodCount: bigint;
+}
+export interface CreateFeeStructureInput {
+    endDate: Timestamp;
+    period: FeePeriod;
+    name: string;
+    latePenalty?: LatePenalty;
+    dueDate: Timestamp;
+    description: string;
+    amount: bigint;
+    startDate: Timestamp;
+}
+export interface Student {
+    id: StudentId;
+    studentId: string;
+    name: string;
+    createdAt: Timestamp;
+    email: string;
+    updatedAt: Timestamp;
+    group: string;
+}
+export interface RecordPaymentInput {
+    method: PaymentMethod;
+    studentId: StudentId;
+    feeStructureId: FeeStructureId;
+    date: Timestamp;
+    notes: string;
+    amount: bigint;
+    receiptNumber: string;
+}
+export interface PaymentMethodBreakdown {
+    cash: bigint;
+    check: bigint;
+    transfer: bigint;
+    online: bigint;
+}
 export interface CreateStudentInput {
     studentId: string;
     name: string;
@@ -187,13 +207,30 @@ export interface CollectionSummary {
     totalCollected: bigint;
     totalOutstanding: bigint;
     totalWaived: bigint;
+    totalOutstandingWithPenalty: bigint;
     paymentCount: bigint;
 }
-export interface AgingBucket {
-    count: bigint;
-    totalAmount: bigint;
-    bucket: string;
+export type FeeStructureId = bigint;
+export interface Payment {
+    id: PaymentId;
+    method: PaymentMethod;
+    studentId: StudentId;
+    feeStructureId: FeeStructureId;
+    date: Timestamp;
+    createdAt: Timestamp;
+    notes: string;
+    amount: bigint;
+    receiptNumber: string;
 }
+export interface AgingBucketDetail {
+    daysOverdue: bigint;
+    feeStructureName: string;
+    studentId: string;
+    studentName: string;
+    amountPaid: bigint;
+    amountDue: bigint;
+}
+export type StudentId = bigint;
 export type LatePenalty = {
     __kind__: "fixed";
     fixed: bigint;
@@ -202,7 +239,6 @@ export type LatePenalty = {
     percentage: bigint;
 };
 export type PaymentId = bigint;
-export type AssignmentId = bigint;
 export interface FeeAssignment {
     id: AssignmentId;
     status: PaymentStatus;
@@ -211,15 +247,6 @@ export interface FeeAssignment {
     assignedAt: Timestamp;
     waivedReason?: string;
     updatedAt: Timestamp;
-}
-export interface Student {
-    id: StudentId;
-    studentId: string;
-    name: string;
-    createdAt: Timestamp;
-    email: string;
-    updatedAt: Timestamp;
-    group: string;
 }
 export enum FeePeriod {
     semester = "semester",
@@ -240,6 +267,10 @@ export enum PaymentStatus {
     waived = "waived",
     partial = "partial"
 }
+export enum RecordPaymentError {
+    DuplicateReceipt = "DuplicateReceipt",
+    NotFound = "NotFound"
+}
 export enum UserRole {
     admin = "admin",
     user = "user",
@@ -250,16 +281,19 @@ export interface backendInterface {
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     assignFeeToGroup(group: string, feeStructureId: FeeStructureId): Promise<Array<FeeAssignment>>;
     assignFeeToStudent(studentId: StudentId, feeStructureId: FeeStructureId): Promise<FeeAssignment>;
-    bulkImportStudents(rows: Array<CsvStudentRow>): Promise<Array<Student>>;
+    bulkImportStudents(rows: Array<CsvStudentRow>): Promise<ImportResult>;
+    checkReceiptExists(receiptNumber: string): Promise<boolean>;
     createFeeStructure(input: CreateFeeStructureInput): Promise<FeeStructure>;
     createStudent(input: CreateStudentInput): Promise<Student>;
     deleteFeeStructure(id: FeeStructureId): Promise<boolean>;
     deleteStudent(id: StudentId): Promise<boolean>;
     duplicateFeeStructure(id: FeeStructureId): Promise<FeeStructure | null>;
     getAgingReport(): Promise<Array<AgingBucket>>;
+    getAgingReportDetail(bucketIndex: bigint): Promise<Array<AgingBucketDetail>>;
     getAllBalances(): Promise<Array<StudentBalance>>;
     getCallerUserRole(): Promise<UserRole>;
     getCollectionSummary(): Promise<CollectionSummary>;
+    getCollectionTrends(): Promise<CollectionTrends>;
     getFeeStructure(id: FeeStructureId): Promise<FeeStructure | null>;
     getFeeStructureBalances(feeStructureId: FeeStructureId): Promise<Array<StudentBalance>>;
     getPaymentMethodBreakdown(): Promise<PaymentMethodBreakdown>;
@@ -270,14 +304,20 @@ export interface backendInterface {
     listFeeStructures(): Promise<Array<FeeStructure>>;
     listStudents(): Promise<Array<Student>>;
     listStudentsByGroup(group: string): Promise<Array<Student>>;
-    recordPayment(input: RecordPaymentInput): Promise<Payment>;
+    recordPayment(input: RecordPaymentInput): Promise<{
+        __kind__: "ok";
+        ok: Payment;
+    } | {
+        __kind__: "err";
+        err: RecordPaymentError;
+    }>;
     unenrollStudent(studentId: StudentId, feeStructureId: FeeStructureId): Promise<boolean>;
     updateFeeStructure(input: UpdateFeeStructureInput): Promise<FeeStructure | null>;
     updateOverdueStatuses(): Promise<void>;
     updateStudent(input: UpdateStudentInput): Promise<Student | null>;
     waiveFee(studentId: StudentId, feeStructureId: FeeStructureId, reason: string): Promise<FeeAssignment | null>;
 }
-import type { AssignmentId as _AssignmentId, CreateFeeStructureInput as _CreateFeeStructureInput, FeeAssignment as _FeeAssignment, FeePeriod as _FeePeriod, FeeStructure as _FeeStructure, FeeStructureId as _FeeStructureId, LatePenalty as _LatePenalty, Payment as _Payment, PaymentId as _PaymentId, PaymentMethod as _PaymentMethod, PaymentStatus as _PaymentStatus, RecordPaymentInput as _RecordPaymentInput, Student as _Student, StudentBalance as _StudentBalance, StudentId as _StudentId, Timestamp as _Timestamp, UpdateFeeStructureInput as _UpdateFeeStructureInput, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
+import type { AssignmentId as _AssignmentId, CreateFeeStructureInput as _CreateFeeStructureInput, FeeAssignment as _FeeAssignment, FeePeriod as _FeePeriod, FeeStructure as _FeeStructure, FeeStructureId as _FeeStructureId, LatePenalty as _LatePenalty, Payment as _Payment, PaymentId as _PaymentId, PaymentMethod as _PaymentMethod, PaymentStatus as _PaymentStatus, RecordPaymentError as _RecordPaymentError, RecordPaymentInput as _RecordPaymentInput, Student as _Student, StudentBalance as _StudentBalance, StudentId as _StudentId, Timestamp as _Timestamp, UpdateFeeStructureInput as _UpdateFeeStructureInput, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
     async _initializeAccessControl(): Promise<void> {
@@ -336,7 +376,7 @@ export class Backend implements backendInterface {
             return from_candid_FeeAssignment_n4(this._uploadFile, this._downloadFile, result);
         }
     }
-    async bulkImportStudents(arg0: Array<CsvStudentRow>): Promise<Array<Student>> {
+    async bulkImportStudents(arg0: Array<CsvStudentRow>): Promise<ImportResult> {
         if (this.processError) {
             try {
                 const result = await this.actor.bulkImportStudents(arg0);
@@ -347,6 +387,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.bulkImportStudents(arg0);
+            return result;
+        }
+    }
+    async checkReceiptExists(arg0: string): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.checkReceiptExists(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.checkReceiptExists(arg0);
             return result;
         }
     }
@@ -434,6 +488,20 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async getAgingReportDetail(arg0: bigint): Promise<Array<AgingBucketDetail>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAgingReportDetail(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAgingReportDetail(arg0);
+            return result;
+        }
+    }
     async getAllBalances(): Promise<Array<StudentBalance>> {
         if (this.processError) {
             try {
@@ -473,6 +541,20 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.getCollectionSummary();
+            return result;
+        }
+    }
+    async getCollectionTrends(): Promise<CollectionTrends> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getCollectionTrends();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getCollectionTrends();
             return result;
         }
     }
@@ -616,18 +698,24 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async recordPayment(arg0: RecordPaymentInput): Promise<Payment> {
+    async recordPayment(arg0: RecordPaymentInput): Promise<{
+        __kind__: "ok";
+        ok: Payment;
+    } | {
+        __kind__: "err";
+        err: RecordPaymentError;
+    }> {
         if (this.processError) {
             try {
                 const result = await this.actor.recordPayment(to_candid_RecordPaymentInput_n35(this._uploadFile, this._downloadFile, arg0));
-                return from_candid_Payment_n29(this._uploadFile, this._downloadFile, result);
+                return from_candid_variant_n39(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.recordPayment(to_candid_RecordPaymentInput_n35(this._uploadFile, this._downloadFile, arg0));
-            return from_candid_Payment_n29(this._uploadFile, this._downloadFile, result);
+            return from_candid_variant_n39(this._uploadFile, this._downloadFile, result);
         }
     }
     async unenrollStudent(arg0: StudentId, arg1: FeeStructureId): Promise<boolean> {
@@ -647,14 +735,14 @@ export class Backend implements backendInterface {
     async updateFeeStructure(arg0: UpdateFeeStructureInput): Promise<FeeStructure | null> {
         if (this.processError) {
             try {
-                const result = await this.actor.updateFeeStructure(to_candid_UpdateFeeStructureInput_n39(this._uploadFile, this._downloadFile, arg0));
+                const result = await this.actor.updateFeeStructure(to_candid_UpdateFeeStructureInput_n42(this._uploadFile, this._downloadFile, arg0));
                 return from_candid_opt_n22(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.updateFeeStructure(to_candid_UpdateFeeStructureInput_n39(this._uploadFile, this._downloadFile, arg0));
+            const result = await this.actor.updateFeeStructure(to_candid_UpdateFeeStructureInput_n42(this._uploadFile, this._downloadFile, arg0));
             return from_candid_opt_n22(this._uploadFile, this._downloadFile, result);
         }
     }
@@ -690,14 +778,14 @@ export class Backend implements backendInterface {
         if (this.processError) {
             try {
                 const result = await this.actor.waiveFee(arg0, arg1, arg2);
-                return from_candid_opt_n41(this._uploadFile, this._downloadFile, result);
+                return from_candid_opt_n44(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.waiveFee(arg0, arg1, arg2);
-            return from_candid_opt_n41(this._uploadFile, this._downloadFile, result);
+            return from_candid_opt_n44(this._uploadFile, this._downloadFile, result);
         }
     }
 }
@@ -722,6 +810,9 @@ function from_candid_PaymentStatus_n6(_uploadFile: (file: ExternalBlob) => Promi
 function from_candid_Payment_n29(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Payment): Payment {
     return from_candid_record_n30(_uploadFile, _downloadFile, value);
 }
+function from_candid_RecordPaymentError_n40(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _RecordPaymentError): RecordPaymentError {
+    return from_candid_variant_n41(_uploadFile, _downloadFile, value);
+}
 function from_candid_StudentBalance_n24(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _StudentBalance): StudentBalance {
     return from_candid_record_n25(_uploadFile, _downloadFile, value);
 }
@@ -737,7 +828,7 @@ function from_candid_opt_n22(_uploadFile: (file: ExternalBlob) => Promise<Uint8A
 function from_candid_opt_n33(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_Student]): Student | null {
     return value.length === 0 ? null : value[0];
 }
-function from_candid_opt_n41(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_FeeAssignment]): FeeAssignment | null {
+function from_candid_opt_n44(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_FeeAssignment]): FeeAssignment | null {
     return value.length === 0 ? null : from_candid_FeeAssignment_n4(_uploadFile, _downloadFile, value[0]);
 }
 function from_candid_opt_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [string]): string | null {
@@ -788,9 +879,11 @@ function from_candid_record_n25(_uploadFile: (file: ExternalBlob) => Promise<Uin
     studentId: _StudentId;
     feeStructureId: _FeeStructureId;
     studentName: string;
+    penaltyAmount: bigint;
     dueDate: _Timestamp;
     totalAmount: bigint;
     outstandingAmount: bigint;
+    totalWithPenalty: bigint;
     paidAmount: bigint;
 }): {
     status: PaymentStatus;
@@ -798,9 +891,11 @@ function from_candid_record_n25(_uploadFile: (file: ExternalBlob) => Promise<Uin
     studentId: StudentId;
     feeStructureId: FeeStructureId;
     studentName: string;
+    penaltyAmount: bigint;
     dueDate: Timestamp;
     totalAmount: bigint;
     outstandingAmount: bigint;
+    totalWithPenalty: bigint;
     paidAmount: bigint;
 } {
     return {
@@ -809,9 +904,11 @@ function from_candid_record_n25(_uploadFile: (file: ExternalBlob) => Promise<Uin
         studentId: value.studentId,
         feeStructureId: value.feeStructureId,
         studentName: value.studentName,
+        penaltyAmount: value.penaltyAmount,
         dueDate: value.dueDate,
         totalAmount: value.totalAmount,
         outstandingAmount: value.outstandingAmount,
+        totalWithPenalty: value.totalWithPenalty,
         paidAmount: value.paidAmount
     };
 }
@@ -925,6 +1022,32 @@ function from_candid_variant_n32(_uploadFile: (file: ExternalBlob) => Promise<Ui
 }): PaymentMethod {
     return "cash" in value ? PaymentMethod.cash : "check" in value ? PaymentMethod.check : "transfer" in value ? PaymentMethod.transfer : "online" in value ? PaymentMethod.online : value;
 }
+function from_candid_variant_n39(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    ok: _Payment;
+} | {
+    err: _RecordPaymentError;
+}): {
+    __kind__: "ok";
+    ok: Payment;
+} | {
+    __kind__: "err";
+    err: RecordPaymentError;
+} {
+    return "ok" in value ? {
+        __kind__: "ok",
+        ok: from_candid_Payment_n29(_uploadFile, _downloadFile, value.ok)
+    } : "err" in value ? {
+        __kind__: "err",
+        err: from_candid_RecordPaymentError_n40(_uploadFile, _downloadFile, value.err)
+    } : value;
+}
+function from_candid_variant_n41(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    DuplicateReceipt: null;
+} | {
+    NotFound: null;
+}): RecordPaymentError {
+    return "DuplicateReceipt" in value ? RecordPaymentError.DuplicateReceipt : "NotFound" in value ? RecordPaymentError.NotFound : value;
+}
 function from_candid_variant_n7(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     pending: null;
 } | {
@@ -965,8 +1088,8 @@ function to_candid_PaymentMethod_n37(_uploadFile: (file: ExternalBlob) => Promis
 function to_candid_RecordPaymentInput_n35(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: RecordPaymentInput): _RecordPaymentInput {
     return to_candid_record_n36(_uploadFile, _downloadFile, value);
 }
-function to_candid_UpdateFeeStructureInput_n39(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UpdateFeeStructureInput): _UpdateFeeStructureInput {
-    return to_candid_record_n40(_uploadFile, _downloadFile, value);
+function to_candid_UpdateFeeStructureInput_n42(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UpdateFeeStructureInput): _UpdateFeeStructureInput {
+    return to_candid_record_n43(_uploadFile, _downloadFile, value);
 }
 function to_candid_UserRole_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserRole): _UserRole {
     return to_candid_variant_n2(_uploadFile, _downloadFile, value);
@@ -1028,7 +1151,7 @@ function to_candid_record_n36(_uploadFile: (file: ExternalBlob) => Promise<Uint8
         receiptNumber: value.receiptNumber
     };
 }
-function to_candid_record_n40(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function to_candid_record_n43(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     id: FeeStructureId;
     endDate: Timestamp;
     period: FeePeriod;

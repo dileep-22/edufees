@@ -16,10 +16,10 @@ export function useFeeStructures() {
   return useQuery<FeeStructure[]>({
     queryKey: ["feeStructures"],
     queryFn: async () => {
-      if (!actor) return [];
-      return actor.listFeeStructures();
+      return actor!.listFeeStructures();
     },
     enabled: !!actor && !isFetching,
+    retry: 1,
   });
 }
 
@@ -28,10 +28,10 @@ export function useFeeStructure(id: bigint) {
   return useQuery<FeeStructure | null>({
     queryKey: ["feeStructure", id.toString()],
     queryFn: async () => {
-      if (!actor) return null;
-      return actor.getFeeStructure(id);
+      return actor!.getFeeStructure(id);
     },
     enabled: !!actor && !isFetching,
+    retry: 1,
   });
 }
 

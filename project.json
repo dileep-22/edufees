@@ -1,21 +1,23 @@
 {
-  "overview": "An admin-only fee management system for educational institutions. Admins define fee structures, enroll students, record payments, track collections, and generate reports — all from a clean, purpose-built dashboard.",
+  "overview": "EduFees is a fee management web application for educational institutions. It enables admins to manage fee structures, student rosters, payment recording, and collections reporting — all secured with Internet Identity authentication.",
   "features": [
-    "Define fee types and schedules (tuition, registration, activity, and more)",
-    "Bulk import students via CSV and assign them to fee programs",
-    "Record payments manually with receipt generation and balance tracking",
-    "Track payment status per student with overdue and partial indicators",
-    "Dashboard with summary stats: collected, outstanding, late payment rate",
-    "Collections and aging reports exportable to CSV"
+    "Internet Identity login with polished authentication page",
+    "Fee structure builder with late penalty configuration",
+    "Student roster management with bulk CSV import and row-level error reporting",
+    "Manual payment recording with duplicate receipt detection",
+    "Collections dashboard with trend indicators",
+    "Aging report with drill-down into overdue payments",
+    "Empty state quickstart actions across all pages",
+    "CSV export for all reports"
   ],
-  "category": "productivity",
+  "category": "education",
   "tags": [
-    "education",
     "fee-management",
-    "admin",
+    "education",
     "payments",
-    "school",
-    "reporting"
+    "reporting",
+    "internet-identity",
+    "admin"
   ],
-  "last_updated": "2026-04-08T17:02:46.197Z"
+  "last_updated": "2026-04-08T18:13:14.214Z"
 }

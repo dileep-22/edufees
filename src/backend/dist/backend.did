@@ -33,10 +33,12 @@ type StudentBalance =
    feeStructureName: text;
    outstandingAmount: nat;
    paidAmount: nat;
+   penaltyAmount: nat;
    status: PaymentStatus;
    studentId: StudentId;
    studentName: text;
    totalAmount: nat;
+   totalWithPenalty: nat;
  };
 type Student = 
  record {
@@ -57,6 +59,11 @@ type RecordPaymentInput =
    notes: text;
    receiptNumber: text;
    studentId: StudentId;
+ };
+type RecordPaymentError = 
+ variant {
+   DuplicateReceipt;
+   NotFound;
  };
 type PaymentStatus = 
  variant {
@@ -97,6 +104,18 @@ type LatePenalty =
  variant {
    fixed: nat;
    percentage: nat;
+ };
+type ImportRowError = 
+ record {
+   field: text;
+   message: text;
+   row: nat;
+   value: text;
+ };
+type ImportResult = 
+ record {
+   errors: vec ImportRowError;
+   imported: nat;
  };
 type FeeStructureId = nat;
 type FeeStructure = 
@@ -155,15 +174,32 @@ type CreateFeeStructureInput =
    period: FeePeriod;
    startDate: Timestamp;
  };
+type CollectionTrends = 
+ record {
+   currentPeriodCount: nat;
+   currentPeriodTotal: nat;
+   previousPeriodCount: nat;
+   previousPeriodTotal: nat;
+ };
 type CollectionSummary = 
  record {
    paymentCount: nat;
    totalCollected: nat;
    totalOutstanding: nat;
+   totalOutstandingWithPenalty: nat;
    totalOverdue: nat;
    totalWaived: nat;
  };
 type AssignmentId = nat;
+type AgingBucketDetail = 
+ record {
+   amountDue: nat;
+   amountPaid: nat;
+   daysOverdue: nat;
+   feeStructureName: text;
+   studentId: text;
+   studentName: text;
+ };
 type AgingBucket = 
  record {
    bucket: text;
@@ -177,16 +213,19 @@ service : {
    (vec FeeAssignment);
   assignFeeToStudent: (studentId: StudentId, feeStructureId:
    FeeStructureId) -> (FeeAssignment);
-  bulkImportStudents: (rows: vec CsvStudentRow) -> (vec Student);
+  bulkImportStudents: (rows: vec CsvStudentRow) -> (ImportResult);
+  checkReceiptExists: (receiptNumber: text) -> (bool) query;
   createFeeStructure: (input: CreateFeeStructureInput) -> (FeeStructure);
   createStudent: (input: CreateStudentInput) -> (Student);
   deleteFeeStructure: (id: FeeStructureId) -> (bool);
   deleteStudent: (id: StudentId) -> (bool);
   duplicateFeeStructure: (id: FeeStructureId) -> (opt FeeStructure);
   getAgingReport: () -> (vec AgingBucket);
+  getAgingReportDetail: (bucketIndex: nat) -> (vec AgingBucketDetail);
   getAllBalances: () -> (vec StudentBalance) query;
   getCallerUserRole: () -> (UserRole) query;
   getCollectionSummary: () -> (CollectionSummary) query;
+  getCollectionTrends: () -> (CollectionTrends) query;
   getFeeStructure: (id: FeeStructureId) -> (opt FeeStructure) query;
   getFeeStructureBalances: (feeStructureId: FeeStructureId) ->
    (vec StudentBalance) query;
@@ -199,7 +238,11 @@ service : {
   listFeeStructures: () -> (vec FeeStructure) query;
   listStudents: () -> (vec Student) query;
   listStudentsByGroup: (group: text) -> (vec Student) query;
-  recordPayment: (input: RecordPaymentInput) -> (Payment);
+  recordPayment: (input: RecordPaymentInput) ->
+   (variant {
+      err: RecordPaymentError;
+      ok: Payment;
+    });
   unenrollStudent: (studentId: StudentId, feeStructureId: FeeStructureId) ->
    (bool);
   updateFeeStructure: (input: UpdateFeeStructureInput) -> (opt FeeStructure);

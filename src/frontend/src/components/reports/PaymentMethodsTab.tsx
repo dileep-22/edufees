@@ -3,7 +3,14 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Banknote, Building2, CreditCard, Download, Globe } from "lucide-react";
+import {
+  AlertCircle,
+  Banknote,
+  Building2,
+  CreditCard,
+  Download,
+  Globe,
+} from "lucide-react";
 import { useMemo } from "react";
 import { usePaymentMethodBreakdown } from "../../hooks/use-payments";
 import { PaymentMethod } from "../../types";
@@ -133,7 +140,7 @@ function DonutChart({
 }
 
 export function PaymentMethodsTab() {
-  const { data: breakdown, isLoading } = usePaymentMethodBreakdown();
+  const { data: breakdown, isLoading, isError } = usePaymentMethodBreakdown();
 
   const segments = useMemo(() => {
     if (!breakdown)
@@ -161,6 +168,24 @@ export function PaymentMethodsTab() {
 
   return (
     <div className="space-y-5" data-ocid="payment-methods-tab">
+      {/* Error banner */}
+      {isError && (
+        <div
+          className="flex items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+          data-ocid="methods-error-banner"
+          role="alert"
+        >
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+          <div>
+            <p className="font-semibold">Failed to load payment methods data</p>
+            <p className="text-xs mt-0.5 opacity-80">
+              Unable to retrieve payment breakdown. Please refresh the page or
+              try again. Ensure you are signed in with admin access.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Donut chart */}
         <Card className="border border-border shadow-card lg:col-span-1">

@@ -6,6 +6,11 @@ import StudentTypes "../types/students";
 import FeeTypes "../types/fees";
 
 module {
+  // nanoseconds per day
+  let dayNs : Int = 86_400_000_000_000;
+  // 30 days in nanoseconds (86_400_000_000_000 * 30)
+  let thirtyDaysNs : Int = 2_592_000_000_000_000;
+
   // Helper: sum payments for a given student+fee assignment
   func paidAmountFor(
     payments : List.List<PaymentTypes.Payment>,
@@ -21,13 +26,41 @@ module {
     total;
   };
 
+  // Helper: calculate late penalty amount for an outstanding balance
+  func calcPenalty(fee : FeeTypes.FeeStructure, outstanding : Nat, now : Int) : Nat {
+    if (now <= fee.dueDate) { return 0 };
+    switch (fee.latePenalty) {
+      case null { 0 };
+      case (? #fixed(amt)) { amt };
+      case (? #percentage(bps)) {
+        // bps = basis points (e.g. 500 = 5.00%)
+        fee.amount * bps / 10_000;
+      };
+    };
+  };
+
+  public func checkReceiptExists(
+    payments : List.List<PaymentTypes.Payment>,
+    receiptNumber : Text
+  ) : Bool {
+    switch (payments.find(func(p) { p.receiptNumber == receiptNumber })) {
+      case (?_) { true };
+      case null { false };
+    };
+  };
+
   public func recordPayment(
     payments : List.List<PaymentTypes.Payment>,
     assignments : List.List<PaymentTypes.FeeAssignment>,
     feeStructures : List.List<FeeTypes.FeeStructure>,
     nextId : Nat,
     input : PaymentTypes.RecordPaymentInput
-  ) : PaymentTypes.Payment {
+  ) : { #ok : PaymentTypes.Payment; #err : PaymentTypes.RecordPaymentError } {
+    // Duplicate receipt check
+    if (checkReceiptExists(payments, input.receiptNumber)) {
+      return #err(#DuplicateReceipt);
+    };
+
     let now = Time.now();
     let payment : PaymentTypes.Payment = {
       id = nextId;
@@ -61,7 +94,7 @@ module {
         } else { a };
       }
     );
-    payment;
+    #ok(payment);
   };
 
   public func assignFeeToStudent(
@@ -180,6 +213,8 @@ module {
       case (?student, ?fee) {
         let paid = paidAmountFor(payments, a.studentId, a.feeStructureId);
         let outstanding = if (paid >= fee.amount) { 0 } else { fee.amount - paid };
+        let now = Time.now();
+        let penalty = if (outstanding > 0) { calcPenalty(fee, outstanding, now) } else { 0 };
         ?{
           studentId = a.studentId;
           studentName = student.name;
@@ -188,6 +223,8 @@ module {
           totalAmount = fee.amount;
           paidAmount = paid;
           outstandingAmount = outstanding;
+          penaltyAmount = penalty;
+          totalWithPenalty = outstanding + penalty;
           status = a.status;
           dueDate = fee.dueDate;
         };
@@ -242,8 +279,10 @@ module {
     var totalCollected : Nat = 0;
     payments.forEach(func(p) { totalCollected += p.amount });
     var totalOutstanding : Nat = 0;
+    var totalOutstandingWithPenalty : Nat = 0;
     var totalOverdue : Nat = 0;
     var totalWaived : Nat = 0;
+    let now = Time.now();
 
     assignments.forEach(
       func(a) {
@@ -254,9 +293,22 @@ module {
             let outstanding = if (paid >= fee.amount) { 0 } else { fee.amount - paid };
             switch (a.status) {
               case (#waived) { totalWaived += fee.amount };
-              case (#overdue) { totalOutstanding += outstanding; totalOverdue += outstanding };
-              case (#pending) { totalOutstanding += outstanding };
-              case (#partial) { totalOutstanding += outstanding };
+              case (#overdue) {
+                totalOutstanding += outstanding;
+                totalOverdue += outstanding;
+                let penalty = calcPenalty(fee, outstanding, now);
+                totalOutstandingWithPenalty += outstanding + penalty;
+              };
+              case (#pending) {
+                totalOutstanding += outstanding;
+                let penalty = calcPenalty(fee, outstanding, now);
+                totalOutstandingWithPenalty += outstanding + penalty;
+              };
+              case (#partial) {
+                totalOutstanding += outstanding;
+                let penalty = calcPenalty(fee, outstanding, now);
+                totalOutstandingWithPenalty += outstanding + penalty;
+              };
               case (#paid) {};
             };
           };
@@ -267,9 +319,39 @@ module {
     {
       totalCollected = totalCollected;
       totalOutstanding = totalOutstanding;
+      totalOutstandingWithPenalty = totalOutstandingWithPenalty;
       totalOverdue = totalOverdue;
       totalWaived = totalWaived;
       paymentCount = payments.size();
+    };
+  };
+
+  public func getCollectionTrends(
+    payments : List.List<PaymentTypes.Payment>
+  ) : PaymentTypes.CollectionTrends {
+    let now = Time.now();
+    let currentStart = now - thirtyDaysNs;
+    let previousStart = now - (2 * thirtyDaysNs);
+    var currentTotal : Nat = 0;
+    var previousTotal : Nat = 0;
+    var currentCount : Nat = 0;
+    var previousCount : Nat = 0;
+
+    payments.forEach(func(p) {
+      if (p.date >= currentStart and p.date <= now) {
+        currentTotal += p.amount;
+        currentCount += 1;
+      } else if (p.date >= previousStart and p.date < currentStart) {
+        previousTotal += p.amount;
+        previousCount += 1;
+      };
+    });
+
+    {
+      currentPeriodTotal = currentTotal;
+      previousPeriodTotal = previousTotal;
+      currentPeriodCount = currentCount;
+      previousPeriodCount = previousCount;
     };
   };
 
@@ -304,8 +386,6 @@ module {
     feeStructures : List.List<FeeTypes.FeeStructure>,
     now : Common.Timestamp
   ) : [PaymentTypes.AgingBucket] {
-    // nanoseconds per day
-    let dayNs : Int = 86_400_000_000_000;
     var count0_30 : Nat = 0;
     var amount0_30 : Nat = 0;
     var count30_60 : Nat = 0;
@@ -345,6 +425,55 @@ module {
       { bucket = "30-60"; count = count30_60; totalAmount = amount30_60 },
       { bucket = "60+"; count = count60plus; totalAmount = amount60plus },
     ];
+  };
+
+  public func getAgingReportDetail(
+    assignments : List.List<PaymentTypes.FeeAssignment>,
+    payments : List.List<PaymentTypes.Payment>,
+    students : List.List<StudentTypes.Student>,
+    feeStructures : List.List<FeeTypes.FeeStructure>,
+    now : Common.Timestamp,
+    bucketIndex : Nat
+  ) : [PaymentTypes.AgingBucketDetail] {
+    let result = List.empty<PaymentTypes.AgingBucketDetail>();
+
+    assignments.forEach(
+      func(a) {
+        if (a.status == #overdue) {
+          let studentOpt = students.find(func(s) { s.id == a.studentId });
+          let feeOpt = feeStructures.find(func(f) { f.id == a.feeStructureId });
+          switch (studentOpt, feeOpt) {
+            case (?student, ?fee) {
+              let paid = paidAmountFor(payments, a.studentId, a.feeStructureId);
+              let outstanding = if (paid >= fee.amount) { 0 } else { fee.amount - paid };
+              if (outstanding > 0) {
+                let daysOverdue = (now - fee.dueDate) / dayNs;
+                let inBucket = if (bucketIndex == 0) {
+                  daysOverdue >= 0 and daysOverdue <= 30;
+                } else if (bucketIndex == 1) {
+                  daysOverdue > 30 and daysOverdue <= 60;
+                } else {
+                  daysOverdue > 60;
+                };
+                if (inBucket) {
+                  result.add({
+                    studentName = student.name;
+                    studentId = student.studentId;
+                    feeStructureName = fee.name;
+                    daysOverdue = daysOverdue.toNat();
+                    amountDue = outstanding;
+                    amountPaid = paid;
+                  });
+                };
+              };
+            };
+            case _ {};
+          };
+        };
+      }
+    );
+
+    result.toArray();
   };
 
   public func getPaymentMethodBreakdown(

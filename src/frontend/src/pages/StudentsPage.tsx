@@ -515,23 +515,33 @@ export default function StudentsPage() {
               className="border-0 rounded-none"
               onRowClick={(s) => navigate({ to: `/students/${s.id}` })}
               emptyState={
-                <EmptyState
-                  icon={UserPlus}
-                  title="No students found"
-                  description={
-                    search
-                      ? "Try adjusting your search query."
-                      : "Add a student or import via CSV to get started."
-                  }
-                  action={
-                    !search
-                      ? {
-                          label: "Add student",
-                          onClick: () => setAddOpen(true),
-                        }
-                      : undefined
-                  }
-                />
+                search || groupFilter !== "all" ? (
+                  <EmptyState
+                    icon={Users}
+                    title="No students found"
+                    description="Try adjusting your search or filter."
+                  />
+                ) : (
+                  <EmptyState
+                    icon={UserPlus}
+                    title="No students yet"
+                    description="Add your first student to start tracking fees and payments."
+                    action={{
+                      label: "Add first student",
+                      onClick: () => setAddOpen(true),
+                    }}
+                    secondaryAction={
+                      <button
+                        type="button"
+                        className="text-sm text-primary hover:underline underline-offset-2 transition-colors"
+                        onClick={() => setCsvOpen(true)}
+                        data-ocid="empty-import-csv-link"
+                      >
+                        Import from CSV
+                      </button>
+                    }
+                  />
+                )
               }
             />
           </CardContent>

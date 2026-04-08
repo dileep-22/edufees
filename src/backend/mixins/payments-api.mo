@@ -17,13 +17,23 @@ mixin (
   assignmentIdCounter : Common.Counter,
   accessControlState : AccessControl.AccessControlState
 ) {
-  public shared ({ caller }) func recordPayment(input : PaymentTypes.RecordPaymentInput) : async PaymentTypes.Payment {
+  public shared ({ caller }) func recordPayment(input : PaymentTypes.RecordPaymentInput) : async { #ok : PaymentTypes.Payment; #err : PaymentTypes.RecordPaymentError } {
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: admin required");
     };
-    let payment = PaymentsLib.recordPayment(payments, assignments, feeStructures, paymentIdCounter.value, input);
-    paymentIdCounter.value += 1;
-    payment;
+    let result = PaymentsLib.recordPayment(payments, assignments, feeStructures, paymentIdCounter.value, input);
+    switch (result) {
+      case (#ok(_)) { paymentIdCounter.value += 1 };
+      case (#err(_)) {};
+    };
+    result;
+  };
+
+  public query ({ caller }) func checkReceiptExists(receiptNumber : Text) : async Bool {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: admin required");
+    };
+    PaymentsLib.checkReceiptExists(payments, receiptNumber);
   };
 
   public shared ({ caller }) func assignFeeToStudent(studentId : Common.StudentId, feeStructureId : Common.FeeStructureId) : async PaymentTypes.FeeAssignment {
@@ -81,6 +91,13 @@ mixin (
     PaymentsLib.getCollectionSummary(assignments, payments, feeStructures);
   };
 
+  public query ({ caller }) func getCollectionTrends() : async PaymentTypes.CollectionTrends {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: admin required");
+    };
+    PaymentsLib.getCollectionTrends(payments);
+  };
+
   public query ({ caller }) func getPaymentsByDateRange(fromDate : Common.Timestamp, toDate : Common.Timestamp) : async [PaymentTypes.Payment] {
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: admin required");
@@ -100,6 +117,13 @@ mixin (
       Runtime.trap("Unauthorized: admin required");
     };
     PaymentsLib.getAgingReport(assignments, payments, students, feeStructures, Time.now());
+  };
+
+  public shared ({ caller }) func getAgingReportDetail(bucketIndex : Nat) : async [PaymentTypes.AgingBucketDetail] {
+    if (not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: admin required");
+    };
+    PaymentsLib.getAgingReportDetail(assignments, payments, students, feeStructures, Time.now(), bucketIndex);
   };
 
   public query ({ caller }) func getPaymentMethodBreakdown() : async PaymentTypes.PaymentMethodBreakdown {

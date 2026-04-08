@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Download, Users } from "lucide-react";
+import { AlertCircle, Download, Users } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useAllBalances } from "../../hooks/use-students";
 import type { StudentBalance } from "../../types";
@@ -45,6 +45,7 @@ function exportCsv(data: StudentBalance[]): void {
     "Total Amount",
     "Paid",
     "Outstanding",
+    "Penalties",
     "Status",
     "Due Date",
   ];
@@ -55,6 +56,7 @@ function exportCsv(data: StudentBalance[]): void {
     (Number(b.totalAmount) / 100).toFixed(2),
     (Number(b.paidAmount) / 100).toFixed(2),
     (Number(b.outstandingAmount) / 100).toFixed(2),
+    (Number(b.penaltyAmount) / 100).toFixed(2),
     b.status,
     formatDate(b.dueDate),
   ]);
@@ -73,7 +75,7 @@ export function StudentBalancesTab() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [statusFilter, setStatusFilter] = useState("all");
 
-  const { data: balances = [], isLoading } = useAllBalances();
+  const { data: balances = [], isLoading, isError } = useAllBalances();
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -101,6 +103,12 @@ export function StudentBalancesTab() {
     });
     return list;
   }, [balances, statusFilter, sortField, sortDir]);
+
+  const hasPenalties = processed.some((b) => b.penaltyAmount > 0n);
+  const totalPenalties = useMemo(
+    () => processed.reduce((sum, b) => sum + b.penaltyAmount, 0n),
+    [processed],
+  );
 
   const columns: Column<StudentBalance>[] = [
     {
@@ -156,6 +164,26 @@ export function StudentBalancesTab() {
       headerClassName: "text-right",
       className: "text-right",
     },
+    ...(hasPenalties
+      ? ([
+          {
+            key: "penaltyAmount",
+            header: "Penalties",
+            render: (b) =>
+              b.penaltyAmount > 0n ? (
+                <CurrencyDisplay
+                  amount={b.penaltyAmount}
+                  size="sm"
+                  className="text-amber-600 font-semibold"
+                />
+              ) : (
+                <span className="text-xs text-muted-foreground">—</span>
+              ),
+            headerClassName: "text-right",
+            className: "text-right",
+          },
+        ] as Column<StudentBalance>[])
+      : []),
     {
       key: "status",
       header: "Status",
@@ -170,6 +198,24 @@ export function StudentBalancesTab() {
 
   return (
     <div className="space-y-4" data-ocid="student-balances-tab">
+      {/* Error banner */}
+      {isError && (
+        <div
+          className="flex items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+          data-ocid="balances-error-banner"
+          role="alert"
+        >
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+          <div>
+            <p className="font-semibold">Failed to load student balances</p>
+            <p className="text-xs mt-0.5 opacity-80">
+              Unable to retrieve balance data. Please refresh the page or try
+              again. Ensure you are signed in with admin access.
+            </p>
+          </div>
+        </div>
+      )}
+
       <Card className="border border-border shadow-card">
         <CardContent className="p-5 space-y-4">
           <div className="flex flex-wrap items-center gap-3">
@@ -245,6 +291,20 @@ export function StudentBalancesTab() {
               />
             }
           />
+
+          {/* Penalties Footer */}
+          {!isLoading && hasPenalties && (
+            <div className="flex items-center justify-between pt-3 border-t border-border">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Total Penalties (shown above)
+              </span>
+              <CurrencyDisplay
+                amount={totalPenalties}
+                size="sm"
+                className="text-amber-600 font-semibold"
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

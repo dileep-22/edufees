@@ -18,6 +18,7 @@ import type { StudentBalance } from "@/types";
 import { PaymentStatus } from "@/types";
 import { useNavigate, useParams } from "@tanstack/react-router";
 import {
+  AlertTriangle,
   ArrowLeft,
   BookOpen,
   CheckCircle2,
@@ -87,6 +88,12 @@ export default function StudentDetailPage() {
     (s, b) => s + b.outstandingAmount,
     0n,
   );
+  const totalPenalty = balances.reduce((s, b) => s + b.penaltyAmount, 0n);
+  const totalWithPenalty = balances.reduce(
+    (s, b) => s + b.totalWithPenalty,
+    0n,
+  );
+  const hasPenalties = totalPenalty > 0n;
 
   const handleWaive = () => {
     if (!waiveTarget) return;
@@ -310,7 +317,9 @@ export default function StudentDetailPage() {
         </Card>
 
         {/* Summary cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div
+          className={`grid grid-cols-1 gap-4 mb-6 ${hasPenalties ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}
+        >
           <StatCard
             label="Total Due"
             value={<CurrencyDisplay amount={totalDue} size="lg" />}
@@ -349,6 +358,39 @@ export default function StudentDetailPage() {
                 : "bg-secondary text-muted-foreground"
             }
           />
+          {hasPenalties && (
+            <Card className="shadow-card border-amber-200 bg-amber-50/40">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 mb-1">
+                      Late Penalties
+                    </p>
+                    <div className="text-lg font-display font-semibold text-amber-700">
+                      <CurrencyDisplay
+                        amount={totalPenalty}
+                        size="lg"
+                        className="text-amber-700"
+                      />
+                    </div>
+                    <p className="text-xs text-amber-600 mt-1">
+                      Total incl. penalties:{" "}
+                      <span className="font-semibold">
+                        <CurrencyDisplay
+                          amount={totalWithPenalty}
+                          size="sm"
+                          className="inline text-amber-700"
+                        />
+                      </span>
+                    </p>
+                  </div>
+                  <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-amber-100 text-amber-600">
+                    <AlertTriangle className="w-4 h-4" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Fee assignments table */}

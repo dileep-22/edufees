@@ -131,7 +131,32 @@
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
   }
 
+  .shadow-subtle {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  }
+
   .text-label {
     @apply text-xs font-semibold tracking-widest uppercase;
+  }
+
+  /* Polished focus ring for accessibility + visual refinement */
+  .focus-ring {
+    @apply outline-none ring-2 ring-offset-2 ring-primary transition-smooth;
+  }
+
+  /* Premium button styling */
+  .btn-primary {
+    @apply bg-primary text-primary-foreground px-6 py-2.5 rounded-lg font-semibold transition-smooth hover:bg-opacity-90 active:ring-2 active:ring-offset-2 active:ring-primary;
+  }
+
+  /* Institutional card treatment with top accent */
+  .card-institutional {
+    @apply bg-card rounded-lg border border-border shadow-card;
+    border-top: 2px solid oklch(var(--primary));
+  }
+
+  /* Subtle form input refinement */
+  .input-refined {
+    @apply border border-input bg-background text-foreground rounded-md px-3 py-2 transition-smooth focus:ring-2 focus:ring-primary focus:ring-offset-2;
   }
 }

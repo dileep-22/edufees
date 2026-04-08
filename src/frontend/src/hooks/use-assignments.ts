@@ -13,10 +13,10 @@ export function useAssignments() {
   return useQuery<StudentBalance[]>({
     queryKey: ["allBalances"],
     queryFn: async () => {
-      if (!actor) return [];
-      return actor.getAllBalances();
+      return actor!.getAllBalances();
     },
     enabled: !!actor && !isFetching,
+    retry: 1,
   });
 }
 
@@ -25,10 +25,10 @@ export function useFeeStructureBalances(feeStructureId: bigint) {
   return useQuery<StudentBalance[]>({
     queryKey: ["feeStructureBalances", feeStructureId.toString()],
     queryFn: async () => {
-      if (!actor) return [];
-      return actor.getFeeStructureBalances(feeStructureId);
+      return actor!.getFeeStructureBalances(feeStructureId);
     },
     enabled: !!actor && !isFetching,
+    retry: 1,
   });
 }
 

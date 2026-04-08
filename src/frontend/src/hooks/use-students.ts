@@ -4,6 +4,7 @@ import { createActor } from "../backend";
 import type {
   CreateStudentInput,
   CsvStudentRow,
+  ImportResult,
   Student,
   StudentBalance,
   UpdateStudentInput,
@@ -18,10 +19,10 @@ export function useStudents() {
   return useQuery<Student[]>({
     queryKey: ["students"],
     queryFn: async () => {
-      if (!actor) return [];
-      return actor.listStudents();
+      return actor!.listStudents();
     },
     enabled: !!actor && !isFetching,
+    retry: 1,
   });
 }
 
@@ -30,10 +31,10 @@ export function useStudent(id: bigint) {
   return useQuery<Student | null>({
     queryKey: ["student", id.toString()],
     queryFn: async () => {
-      if (!actor) return null;
-      return actor.getStudent(id);
+      return actor!.getStudent(id);
     },
     enabled: !!actor && !isFetching,
+    retry: 1,
   });
 }
 
@@ -42,10 +43,10 @@ export function useStudentBalances(studentId: bigint) {
   return useQuery<StudentBalance[]>({
     queryKey: ["studentBalances", studentId.toString()],
     queryFn: async () => {
-      if (!actor) return [];
-      return actor.getStudentBalances(studentId);
+      return actor!.getStudentBalances(studentId);
     },
     enabled: !!actor && !isFetching,
+    retry: 1,
   });
 }
 
@@ -54,10 +55,10 @@ export function useAllBalances() {
   return useQuery<StudentBalance[]>({
     queryKey: ["allBalances"],
     queryFn: async () => {
-      if (!actor) return [];
-      return actor.getAllBalances();
+      return actor!.getAllBalances();
     },
     enabled: !!actor && !isFetching,
+    retry: 1,
   });
 }
 
@@ -108,13 +109,25 @@ export function useDeleteStudent() {
 export function useBulkImportStudents() {
   const { actor } = useBackendActor();
   const queryClient = useQueryClient();
-  return useMutation({
+  return useMutation<ImportResult, Error, CsvStudentRow[]>({
     mutationFn: async (rows: CsvStudentRow[]) => {
       if (!actor) throw new Error("Actor not available");
-      return actor.bulkImportStudents(rows);
+      const result = await actor.bulkImportStudents(rows);
+      // Surface row-level errors as a structured error if any failed
+      if (result.errors.length > 0 && result.imported === 0n) {
+        const summary = result.errors
+          .slice(0, 3)
+          .map((e) => `Row ${e.row}: ${e.message}`)
+          .join("; ");
+        throw new Error(
+          `Import failed: ${summary}${result.errors.length > 3 ? ` and ${result.errors.length - 3} more` : ""}`,
+        );
+      }
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["students"] });
+      queryClient.invalidateQueries({ queryKey: ["allBalances"] });
     },
   });
 }

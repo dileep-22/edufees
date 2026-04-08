@@ -12,7 +12,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useNavigate } from "@tanstack/react-router";
 import {
+  AlertCircle,
   AlertTriangle,
   Clock,
   Download,
@@ -149,15 +151,30 @@ export function CollectionsSummaryTab() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [methodFilter, setMethodFilter] = useState("all");
 
+  const navigate = useNavigate();
+
   const days = Number(dateRange);
   const now = BigInt(Date.now()) * 1_000_000n;
   const from = (BigInt(Date.now()) - BigInt(days * 86_400_000)) * 1_000_000n;
 
-  const { data: payments = [], isLoading: paymentsLoading } = usePayments(
-    from,
-    now,
-  );
-  const { data: summary, isLoading: summaryLoading } = useCollectionSummary();
+  const {
+    data: payments = [],
+    isLoading: paymentsLoading,
+    isError: paymentsError,
+  } = usePayments(from, now);
+  const {
+    data: summary,
+    isLoading: summaryLoading,
+    isError: summaryError,
+  } = useCollectionSummary();
+
+  const isZeroData =
+    !summaryLoading &&
+    summary !== undefined &&
+    summary.totalCollected === 0n &&
+    summary.totalOutstanding === 0n &&
+    summary.totalOverdue === 0n &&
+    summary.paymentCount === 0n;
 
   const filtered = useMemo(() => {
     return payments.filter((p) => {
@@ -195,6 +212,25 @@ export function CollectionsSummaryTab() {
 
   return (
     <div className="space-y-5" data-ocid="collections-summary-tab">
+      {/* Error banner */}
+      {(summaryError || paymentsError) && (
+        <div
+          className="flex items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+          data-ocid="collections-error-banner"
+          role="alert"
+        >
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+          <div>
+            <p className="font-semibold">Failed to load data</p>
+            <p className="text-xs mt-0.5 opacity-80">
+              Unable to retrieve report data. Please refresh the page or try
+              again. If the issue persists, ensure you are signed in with admin
+              access.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Stats Cards */}
       {summaryLoading ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -210,79 +246,96 @@ export function CollectionsSummaryTab() {
         </div>
       )}
 
-      {/* Filters + Table */}
-      <Card className="border border-border shadow-card">
-        <CardContent className="p-5 space-y-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <Select value={dateRange} onValueChange={setDateRange}>
-              <SelectTrigger className="w-40" data-ocid="filter-date-range">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {DATE_RANGES.map((r) => (
-                  <SelectItem key={r.days} value={String(r.days)}>
-                    {r.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+      {/* Zero-data empty state */}
+      {isZeroData ? (
+        <Card className="border border-border shadow-card">
+          <CardContent className="p-0">
+            <EmptyState
+              icon={TrendingUp}
+              title="No payments recorded yet"
+              description="Start tracking fee collections by recording your first payment."
+              action={{
+                label: "Record first payment",
+                onClick: () => navigate({ to: "/payments" }),
+              }}
+            />
+          </CardContent>
+        </Card>
+      ) : (
+        /* Filters + Table */
+        <Card className="border border-border shadow-card">
+          <CardContent className="p-5 space-y-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <Select value={dateRange} onValueChange={setDateRange}>
+                <SelectTrigger className="w-40" data-ocid="filter-date-range">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DATE_RANGES.map((r) => (
+                    <SelectItem key={r.days} value={String(r.days)}>
+                      {r.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-36" data-ocid="filter-status">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {STATUS_OPTIONS.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>
-                    {o.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-36" data-ocid="filter-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            <Select value={methodFilter} onValueChange={setMethodFilter}>
-              <SelectTrigger className="w-36" data-ocid="filter-method">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {METHOD_OPTIONS.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>
-                    {o.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <Select value={methodFilter} onValueChange={setMethodFilter}>
+                <SelectTrigger className="w-36" data-ocid="filter-method">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {METHOD_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-            <div className="ml-auto">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => exportCsv(filtered)}
-                disabled={filtered.length === 0}
-                data-ocid="export-collections-csv"
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Export CSV
-              </Button>
+              <div className="ml-auto">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => exportCsv(filtered)}
+                  disabled={filtered.length === 0}
+                  data-ocid="export-collections-csv"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Export CSV
+                </Button>
+              </div>
             </div>
-          </div>
 
-          <DataTable
-            columns={COLUMNS}
-            data={filtered}
-            keyExtractor={(p) => p.id.toString()}
-            isLoading={paymentsLoading}
-            emptyState={
-              <EmptyState
-                icon={TrendingUp}
-                title="No payments found"
-                description="No payments match your current filters. Try adjusting the date range or filter criteria."
-              />
-            }
-          />
-        </CardContent>
-      </Card>
+            <DataTable
+              columns={COLUMNS}
+              data={filtered}
+              keyExtractor={(p) => p.id.toString()}
+              isLoading={paymentsLoading}
+              emptyState={
+                <EmptyState
+                  icon={TrendingUp}
+                  title="No payments found"
+                  description="No payments match your current filters. Try adjusting the date range or filter criteria."
+                />
+              }
+            />
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

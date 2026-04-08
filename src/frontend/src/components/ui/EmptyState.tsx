@@ -10,6 +10,7 @@ interface EmptyStateProps {
     label: string;
     onClick: () => void;
   };
+  secondaryAction?: React.ReactNode;
   className?: string;
 }
 
@@ -18,6 +19,7 @@ export function EmptyState({
   title,
   description,
   action,
+  secondaryAction,
   className,
 }: EmptyStateProps) {
   return (
@@ -44,6 +46,7 @@ export function EmptyState({
           {action.label}
         </Button>
       )}
+      {secondaryAction && <div className="mt-3">{secondaryAction}</div>}
     </div>
   );
 }

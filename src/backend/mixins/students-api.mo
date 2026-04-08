@@ -47,13 +47,13 @@ mixin (
     StudentsLib.deleteStudent(students, id);
   };
 
-  public shared ({ caller }) func bulkImportStudents(rows : [StudentTypes.CsvStudentRow]) : async [StudentTypes.Student] {
+  public shared ({ caller }) func bulkImportStudents(rows : [StudentTypes.CsvStudentRow]) : async StudentTypes.ImportResult {
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: admin required");
     };
-    let created = StudentsLib.bulkImportStudents(students, studentIdCounter.value, rows);
-    studentIdCounter.value += rows.size();
-    created;
+    let result = StudentsLib.bulkImportStudents(students, studentIdCounter.value, rows);
+    studentIdCounter.value += result.imported;
+    result;
   };
 
   public query ({ caller }) func listStudentsByGroup(group : Text) : async [StudentTypes.Student] {

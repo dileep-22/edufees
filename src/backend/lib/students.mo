@@ -76,25 +76,68 @@ module {
     students : List.List<StudentTypes.Student>,
     nextId : Nat,
     rows : [StudentTypes.CsvStudentRow]
-  ) : [StudentTypes.Student] {
+  ) : StudentTypes.ImportResult {
     let now = Time.now();
     var currentId = nextId;
-    let created = List.empty<StudentTypes.Student>();
+    var imported : Nat = 0;
+    let errors = List.empty<StudentTypes.ImportRowError>();
+
+    var rowIdx : Nat = 0;
     for (row in rows.values()) {
-      let student : StudentTypes.Student = {
-        id = currentId;
-        name = row.name;
-        studentId = row.studentId;
-        email = row.email;
-        group = row.group;
-        createdAt = now;
-        updatedAt = now;
+      var rowErrors = List.empty<StudentTypes.ImportRowError>();
+
+      // Validate name
+      if (row.name.size() == 0) {
+        rowErrors.add({ row = rowIdx; field = "name"; value = row.name; message = "Name is required" });
       };
-      students.add(student);
-      created.add(student);
-      currentId += 1;
+
+      // Validate studentId
+      if (row.studentId.size() == 0) {
+        rowErrors.add({ row = rowIdx; field = "studentId"; value = row.studentId; message = "Student ID is required" });
+      } else {
+        // Check for duplicate studentId in existing students
+        switch (students.find(func(s) { s.studentId == row.studentId })) {
+          case (?_) {
+            rowErrors.add({ row = rowIdx; field = "studentId"; value = row.studentId; message = "Student ID already exists" });
+          };
+          case null {};
+        };
+      };
+
+      // Validate email (basic: must contain @)
+      if (row.email.size() == 0) {
+        rowErrors.add({ row = rowIdx; field = "email"; value = row.email; message = "Email is required" });
+      } else if (not row.email.contains(#char '@')) {
+        rowErrors.add({ row = rowIdx; field = "email"; value = row.email; message = "Email must contain @" });
+      };
+
+      // Validate group
+      if (row.group.size() == 0) {
+        rowErrors.add({ row = rowIdx; field = "group"; value = row.group; message = "Group is required" });
+      };
+
+      if (rowErrors.size() == 0) {
+        // No errors: import this row
+        let student : StudentTypes.Student = {
+          id = currentId;
+          name = row.name;
+          studentId = row.studentId;
+          email = row.email;
+          group = row.group;
+          createdAt = now;
+          updatedAt = now;
+        };
+        students.add(student);
+        currentId += 1;
+        imported += 1;
+      } else {
+        errors.append(rowErrors);
+      };
+
+      rowIdx += 1;
     };
-    created.toArray();
+
+    { imported = imported; errors = errors.toArray() };
   };
 
   public func listStudentsByGroup(

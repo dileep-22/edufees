@@ -11,12 +11,17 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useBulkImportStudents } from "@/hooks/use-students";
-import type { CsvStudentRow } from "@/types";
-import { AlertCircle, CheckCircle2, Upload } from "lucide-react";
+import type { CsvStudentRow, ImportRowError } from "@/types";
+import { AlertCircle, CheckCircle2, Upload, XCircle } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 type ParsedRow = CsvStudentRow & { _rowNum: number; _errors: string[] };
+
+type ImportOutcome = {
+  imported: number;
+  errors: ImportRowError[];
+};
 
 function parseCsv(raw: string): { rows: ParsedRow[]; parseErrors: string[] } {
   const lines = raw
@@ -145,6 +150,110 @@ Alice Johnson,STU-001,alice@school.edu,Year 1
 Bob Smith,STU-002,bob@school.edu,Year 1
 Carol White,STU-003,carol@school.edu,Year 2`;
 
+function ImportResultView({
+  outcome,
+  onClose,
+}: { outcome: ImportOutcome; onClose: () => void }) {
+  const hasErrors = outcome.errors.length > 0;
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Summary banner */}
+      <div
+        className={`flex items-start gap-3 rounded-lg p-4 ${
+          hasErrors
+            ? "bg-amber-50 border border-amber-200"
+            : "bg-emerald-50 border border-emerald-200"
+        }`}
+        data-ocid="import-result-banner"
+      >
+        {hasErrors ? (
+          <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+        ) : (
+          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+        )}
+        <div>
+          <p
+            className={`font-semibold text-sm ${hasErrors ? "text-amber-800" : "text-emerald-800"}`}
+          >
+            {hasErrors
+              ? `${outcome.imported} row${outcome.imported !== 1 ? "s" : ""} imported successfully, ${outcome.errors.length} row${outcome.errors.length !== 1 ? "s" : ""} had errors`
+              : `All ${outcome.imported} student${outcome.imported !== 1 ? "s" : ""} imported successfully`}
+          </p>
+          {hasErrors && (
+            <p className="text-xs text-amber-700 mt-0.5">
+              Valid rows were imported. The rows below were rejected by the
+              server.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Error table */}
+      {hasErrors && (
+        <div className="rounded-lg border border-destructive/20 overflow-hidden">
+          <div className="bg-destructive/5 px-3 py-2 border-b border-destructive/20 flex items-center gap-2">
+            <XCircle className="w-3.5 h-3.5 text-destructive" />
+            <span className="text-xs font-semibold text-destructive uppercase tracking-wide">
+              Import Errors ({outcome.errors.length})
+            </span>
+          </div>
+          <div className="overflow-x-auto max-h-56 overflow-y-auto">
+            <table className="w-full text-xs" data-ocid="import-error-table">
+              <thead>
+                <tr className="border-b border-border bg-muted/40">
+                  <th className="px-3 py-2 text-left font-semibold text-muted-foreground w-14">
+                    Row #
+                  </th>
+                  <th className="px-3 py-2 text-left font-semibold text-muted-foreground w-24">
+                    Field
+                  </th>
+                  <th className="px-3 py-2 text-left font-semibold text-muted-foreground">
+                    Value
+                  </th>
+                  <th className="px-3 py-2 text-left font-semibold text-muted-foreground">
+                    Error
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {outcome.errors.map((err) => (
+                  <tr
+                    key={`${Number(err.row)}-${err.field}`}
+                    className="border-b border-destructive/10 bg-destructive/5 hover:bg-destructive/10 transition-colors"
+                    data-ocid="import-error-row"
+                  >
+                    <td className="px-3 py-2">
+                      <span className="inline-flex items-center justify-center w-6 h-6 rounded bg-destructive/15 text-destructive font-bold">
+                        {Number(err.row)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 font-mono text-muted-foreground">
+                      {err.field || "—"}
+                    </td>
+                    <td className="px-3 py-2 font-mono text-foreground max-w-[120px] truncate">
+                      {err.value || "—"}
+                    </td>
+                    <td className="px-3 py-2 text-destructive">
+                      {err.message}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <div className="flex justify-end">
+        <Button type="button" onClick={onClose} data-ocid="import-done-btn">
+          Done
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function CsvImportModal({
   open,
   onOpenChange,
@@ -155,7 +264,9 @@ export function CsvImportModal({
   const [csvText, setCsvText] = useState("");
   const [preview, setPreview] = useState<ParsedRow[]>([]);
   const [parseErrors, setParseErrors] = useState<string[]>([]);
-  const [successCount, setSuccessCount] = useState<number | null>(null);
+  const [importOutcome, setImportOutcome] = useState<ImportOutcome | null>(
+    null,
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bulkImport = useBulkImportStudents();
 
@@ -163,7 +274,7 @@ export function CsvImportModal({
     const { rows, parseErrors: errs } = parseCsv(csvText);
     setPreview(rows);
     setParseErrors(errs);
-    setSuccessCount(null);
+    setImportOutcome(null);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -176,7 +287,7 @@ export function CsvImportModal({
       const { rows, parseErrors: errs } = parseCsv(text);
       setPreview(rows);
       setParseErrors(errs);
-      setSuccessCount(null);
+      setImportOutcome(null);
     };
     reader.readAsText(file);
   };
@@ -192,14 +303,18 @@ export function CsvImportModal({
       group,
     }));
     bulkImport.mutate(payload, {
-      onSuccess: (imported) => {
-        setSuccessCount(imported.length);
-        toast.success(
-          `${imported.length} student${imported.length !== 1 ? "s" : ""} imported`,
-        );
-        setCsvText("");
+      onSuccess: (result) => {
+        const count = Number(result.imported);
+        const errors = result.errors ?? [];
+        setImportOutcome({ imported: count, errors });
         setPreview([]);
         setParseErrors([]);
+        setCsvText("");
+        if (errors.length === 0) {
+          toast.success(`${count} student${count !== 1 ? "s" : ""} imported`);
+        } else {
+          toast.warning(`${count} imported, ${errors.length} had errors`);
+        }
       },
       onError: () => toast.error("Import failed — please try again"),
     });
@@ -210,7 +325,7 @@ export function CsvImportModal({
       setCsvText("");
       setPreview([]);
       setParseErrors([]);
-      setSuccessCount(null);
+      setImportOutcome(null);
     }
     onOpenChange(v);
   };
@@ -220,7 +335,7 @@ export function CsvImportModal({
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent
-        className="sm:max-w-[680px] max-h-[90vh] flex flex-col"
+        className="sm:max-w-[700px] max-h-[90vh] flex flex-col"
         data-ocid="csv-import-dialog"
       >
         <DialogHeader>
@@ -230,16 +345,11 @@ export function CsvImportModal({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto space-y-4 py-2">
-          {successCount !== null ? (
-            <div className="flex flex-col items-center justify-center py-10 gap-3">
-              <CheckCircle2 className="w-12 h-12 text-emerald-500" />
-              <p className="text-lg font-display font-semibold text-foreground">
-                {successCount} student{successCount !== 1 ? "s" : ""} imported
-              </p>
-              <p className="text-sm text-muted-foreground">
-                Students are now available in the student list.
-              </p>
-            </div>
+          {importOutcome !== null ? (
+            <ImportResultView
+              outcome={importOutcome}
+              onClose={() => handleClose(false)}
+            />
           ) : !isPreviewing ? (
             <>
               <div className="rounded-lg border border-dashed border-border p-4 bg-secondary/40">
@@ -335,36 +445,38 @@ export function CsvImportModal({
           )}
         </div>
 
-        <DialogFooter className="border-t border-border pt-4 mt-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => handleClose(false)}
-          >
-            Close
-          </Button>
-          {successCount !== null ? null : !isPreviewing ? (
+        {importOutcome === null && (
+          <DialogFooter className="border-t border-border pt-4 mt-2">
             <Button
               type="button"
-              disabled={!csvText.trim()}
-              onClick={handleParse}
-              data-ocid="csv-preview-btn"
+              variant="outline"
+              onClick={() => handleClose(false)}
             >
-              Preview import
+              Close
             </Button>
-          ) : (
-            <Button
-              type="button"
-              disabled={bulkImport.isPending || validRows.length === 0}
-              onClick={handleImport}
-              data-ocid="csv-confirm-import-btn"
-            >
-              {bulkImport.isPending
-                ? "Importing…"
-                : `Import ${validRows.length} student${validRows.length !== 1 ? "s" : ""}`}
-            </Button>
-          )}
-        </DialogFooter>
+            {!isPreviewing ? (
+              <Button
+                type="button"
+                disabled={!csvText.trim()}
+                onClick={handleParse}
+                data-ocid="csv-preview-btn"
+              >
+                Preview import
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                disabled={bulkImport.isPending || validRows.length === 0}
+                onClick={handleImport}
+                data-ocid="csv-confirm-import-btn"
+              >
+                {bulkImport.isPending
+                  ? "Importing…"
+                  : `Import ${validRows.length} student${validRows.length !== 1 ? "s" : ""}`}
+              </Button>
+            )}
+          </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );

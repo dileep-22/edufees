@@ -57,7 +57,7 @@ Large section gaps (2rem–3rem) create visual breathing room between fee manage
 
 ## Motion
 
-Entrance: card fade-in (0.3s ease-out) on page load. Hover: buttons + interactive elements use transition-smooth (0.3s cubic-bezier). Decorative: none (productivity context).
+Entrance: card fade-in (0.3s ease-out) on page load. Hover: buttons + interactive elements use transition-smooth (0.3s cubic-bezier). Focus: refined ring states (2px, offset 2px, primary blue) for accessibility and visual polish. Decorative: none (productivity context).
 
 ## Constraints
 
@@ -65,7 +65,16 @@ Entrance: card fade-in (0.3s ease-out) on page load. Hover: buttons + interactiv
 - Data density prioritized — maximize table row height and column width for readability
 - Shadow applied only to floating/card elements, never page sections
 - Charts use chart-1 through chart-5 tokens for consistency
+- All interactive elements must have visible focus states (ring + offset)
 
 ## Signature Detail
 
-Blue-amber duality: deep professional blue for authority and action (buttons, headers, primary) paired with warm amber for human elements (success states, highlights) — reflecting institutional precision tempered by institutional care for students.
+Blue-amber duality: deep professional blue for authority and action (buttons, headers, primary) paired with warm amber for human elements (success states, highlights) — reflecting institutional precision tempered by institutional care for students. Subtle top border accent (2px primary blue) on major content cards signals premium refinement.
+
+## Authentication Pages
+
+Login & Sign-Up pages feature institutional card treatment with top accent border. Clean white card surfaces with subtle shadows, full-height layout with balanced left/right composition. Internet Identity integration with prominent primary blue button.
+
+## Polishing Details
+
+Refined focus rings (2px ring-offset-2) on all interactive elements ensure accessibility while maintaining visual elegance. Subtle shadow hierarchy (`shadow-subtle`, `shadow-card`, `shadow-elevated`) creates depth without heaviness. Button hover states darken smoothly via transition-smooth (0.3s cubic-bezier). Input fields use refined styling with focus ring treatment.
