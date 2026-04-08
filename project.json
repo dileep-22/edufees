@@ -1,0 +1,21 @@
+{
+  "overview": "An admin-only fee management system for educational institutions. Admins define fee structures, enroll students, record payments, track collections, and generate reports — all from a clean, purpose-built dashboard.",
+  "features": [
+    "Define fee types and schedules (tuition, registration, activity, and more)",
+    "Bulk import students via CSV and assign them to fee programs",
+    "Record payments manually with receipt generation and balance tracking",
+    "Track payment status per student with overdue and partial indicators",
+    "Dashboard with summary stats: collected, outstanding, late payment rate",
+    "Collections and aging reports exportable to CSV"
+  ],
+  "category": "productivity",
+  "tags": [
+    "education",
+    "fee-management",
+    "admin",
+    "payments",
+    "school",
+    "reporting"
+  ],
+  "last_updated": "2026-04-08T17:02:46.197Z"
+}
