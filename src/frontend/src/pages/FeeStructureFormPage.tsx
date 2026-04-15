@@ -60,18 +60,17 @@ const DEFAULT_VALUES: FormValues = {
   latePenaltyValue: "",
 };
 
-function timestampToDateString(ts: bigint): string {
-  const ms = Number(ts / 1_000_000n);
-  return new Date(ms).toISOString().slice(0, 10);
+function timestampToDateString(ts: string): string {
+  return new Date(ts).toISOString().slice(0, 10);
 }
 
-function dateStringToTimestamp(dateStr: string): bigint {
-  return BigInt(new Date(dateStr).getTime()) * 1_000_000n;
+function dateStringToTimestamp(dateStr: string): string {
+  return new Date(dateStr).toISOString();
 }
 
-function dollarsToCents(value: string): bigint {
+function dollarsToCents(value: string): number {
   const num = Math.round(Number.parseFloat(value) * 100);
-  return BigInt(num);
+  return num;
 }
 
 function validate(values: FormValues): FormErrors {

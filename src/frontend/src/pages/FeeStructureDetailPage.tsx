@@ -36,24 +36,22 @@ const PERIOD_LABELS: Record<FeePeriod, string> = {
   [FeePeriod.monthly]: "Monthly",
 };
 
-function formatDate(ts: bigint): string {
-  const ms = Number(ts / 1_000_000n);
-  return new Date(ms).toLocaleDateString("en-US", {
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
   });
 }
 
-function isArchived(endDate: bigint): boolean {
-  const now = BigInt(Date.now()) * 1_000_000n;
-  return endDate < now;
+function isArchived(endDate: string): boolean {
+  return new Date(endDate) < new Date();
 }
 
 export default function FeeStructureDetailPage() {
   const navigate = useNavigate();
   const params = useParams({ strict: false }) as { id?: string };
-  const feeId = BigInt(params.id ?? "0");
+  const feeId = Number(params.id ?? "0");
 
   const { data: feeStructure, isLoading: loadingStructure } =
     useFeeStructure(feeId);

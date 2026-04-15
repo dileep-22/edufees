@@ -1,47 +1,38 @@
-import { useActor } from "@caffeineai/core-infrastructure";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createActor } from "../backend";
-import type {
-  CreateFeeStructureInput,
-  FeeStructure,
-  UpdateFeeStructureInput,
-} from "../types";
-
-function useBackendActor() {
-  return useActor(createActor);
-}
+import {
+  feeStructureApi,
+  balanceApi,
+  type FeeStructure,
+  type StudentBalance,
+  type CreateFeeStructureInput,
+  type UpdateFeeStructureInput,
+} from "../api";
 
 export function useFeeStructures() {
-  const { actor, isFetching } = useBackendActor();
   return useQuery<FeeStructure[]>({
     queryKey: ["feeStructures"],
     queryFn: async () => {
-      return actor!.listFeeStructures();
+      return feeStructureApi.list();
     },
-    enabled: !!actor && !isFetching,
     retry: 1,
   });
 }
 
-export function useFeeStructure(id: bigint) {
-  const { actor, isFetching } = useBackendActor();
-  return useQuery<FeeStructure | null>({
+export function useFeeStructure(id: number) {
+  return useQuery<FeeStructure>({
     queryKey: ["feeStructure", id.toString()],
     queryFn: async () => {
-      return actor!.getFeeStructure(id);
+      return feeStructureApi.getById(id);
     },
-    enabled: !!actor && !isFetching,
     retry: 1,
   });
 }
 
 export function useCreateFeeStructure() {
-  const { actor } = useBackendActor();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: CreateFeeStructureInput) => {
-      if (!actor) throw new Error("Actor not available");
-      return actor.createFeeStructure(input);
+      return feeStructureApi.create(input);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["feeStructures"] });
@@ -50,12 +41,10 @@ export function useCreateFeeStructure() {
 }
 
 export function useUpdateFeeStructure() {
-  const { actor } = useBackendActor();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: UpdateFeeStructureInput) => {
-      if (!actor) throw new Error("Actor not available");
-      return actor.updateFeeStructure(input);
+      return feeStructureApi.update(input);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["feeStructures"] });
@@ -64,12 +53,10 @@ export function useUpdateFeeStructure() {
 }
 
 export function useDeleteFeeStructure() {
-  const { actor } = useBackendActor();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: bigint) => {
-      if (!actor) throw new Error("Actor not available");
-      return actor.deleteFeeStructure(id);
+    mutationFn: async (id: number) => {
+      return feeStructureApi.delete(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["feeStructures"] });
@@ -78,12 +65,10 @@ export function useDeleteFeeStructure() {
 }
 
 export function useDuplicateFeeStructure() {
-  const { actor } = useBackendActor();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: bigint) => {
-      if (!actor) throw new Error("Actor not available");
-      return actor.duplicateFeeStructure(id);
+    mutationFn: async (id: number) => {
+      return feeStructureApi.duplicate(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["feeStructures"] });

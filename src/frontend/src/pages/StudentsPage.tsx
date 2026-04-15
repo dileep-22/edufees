@@ -280,10 +280,10 @@ export default function StudentsPage() {
 
   // Derive outstanding balance per student from allBalances
   const outstandingMap = useMemo(() => {
-    const map = new Map<string, bigint>();
+    const map = new Map<string, number>();
     for (const b of allBalances) {
       const key = b.studentId.toString();
-      map.set(key, (map.get(key) ?? 0n) + b.outstandingAmount);
+      map.set(key, (map.get(key) ?? 0) + b.outstandingAmount);
     }
     return map;
   }, [allBalances]);
