@@ -1,47 +1,39 @@
-import { useActor } from "@caffeineai/core-infrastructure";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createActor } from "../backend";
-import type { FeeAssignment, StudentBalance } from "../types";
-
-function useBackendActor() {
-  return useActor(createActor);
-}
+import {
+  assignmentApi,
+  balanceApi,
+  type StudentBalance,
+} from "../api";
 
 export function useAssignments() {
   // Assignments are derived from balances — getAllBalances covers assignment data
-  const { actor, isFetching } = useBackendActor();
   return useQuery<StudentBalance[]>({
     queryKey: ["allBalances"],
     queryFn: async () => {
-      return actor!.getAllBalances();
+      return balanceApi.getAllBalances();
     },
-    enabled: !!actor && !isFetching,
     retry: 1,
   });
 }
 
-export function useFeeStructureBalances(feeStructureId: bigint) {
-  const { actor, isFetching } = useBackendActor();
+export function useFeeStructureBalances(feeStructureId: number) {
   return useQuery<StudentBalance[]>({
     queryKey: ["feeStructureBalances", feeStructureId.toString()],
     queryFn: async () => {
-      return actor!.getFeeStructureBalances(feeStructureId);
+      return balanceApi.getFeeStructureBalances(feeStructureId);
     },
-    enabled: !!actor && !isFetching,
     retry: 1,
   });
 }
 
 export function useAssignFeeToStudent() {
-  const { actor } = useBackendActor();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({
       studentId,
       feeStructureId,
-    }: { studentId: bigint; feeStructureId: bigint }) => {
-      if (!actor) throw new Error("Actor not available");
-      return actor.assignFeeToStudent(studentId, feeStructureId);
+    }: { studentId: number; feeStructureId: number }) => {
+      return assignmentApi.assignToStudent(studentId, feeStructureId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["allBalances"] });
@@ -52,15 +44,13 @@ export function useAssignFeeToStudent() {
 }
 
 export function useAssignFeeToGroup() {
-  const { actor } = useBackendActor();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({
       group,
       feeStructureId,
-    }: { group: string; feeStructureId: bigint }) => {
-      if (!actor) throw new Error("Actor not available");
-      return actor.assignFeeToGroup(group, feeStructureId);
+    }: { group: string; feeStructureId: number }) => {
+      return assignmentApi.assignToGroup(group, feeStructureId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["allBalances"] });
@@ -70,18 +60,16 @@ export function useAssignFeeToGroup() {
 }
 
 export function useUnenrollStudent() {
-  const { actor } = useBackendActor();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({
       studentId,
       feeStructureId,
     }: {
-      studentId: bigint;
-      feeStructureId: bigint;
-    }): Promise<boolean> => {
-      if (!actor) throw new Error("Actor not available");
-      return actor.unenrollStudent(studentId, feeStructureId);
+      studentId: number;
+      feeStructureId: number;
+    }): Promise<void> => {
+      return assignmentApi.unenroll(studentId, feeStructureId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["allBalances"] });
@@ -92,7 +80,6 @@ export function useUnenrollStudent() {
 }
 
 export function useWaiveFee() {
-  const { actor } = useBackendActor();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({
@@ -100,12 +87,11 @@ export function useWaiveFee() {
       feeStructureId,
       reason,
     }: {
-      studentId: bigint;
-      feeStructureId: bigint;
+      studentId: number;
+      feeStructureId: number;
       reason: string;
-    }): Promise<FeeAssignment | null> => {
-      if (!actor) throw new Error("Actor not available");
-      return actor.waiveFee(studentId, feeStructureId, reason);
+    }): Promise<void> => {
+      return assignmentApi.waive(studentId, feeStructureId, reason);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["allBalances"] });

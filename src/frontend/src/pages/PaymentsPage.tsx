@@ -45,8 +45,8 @@ const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   [PaymentMethod.online]: "Online",
 };
 
-function formatDate(ts: bigint) {
-  return new Date(Number(ts) / 1_000_000).toLocaleDateString("en-US", {
+function formatDate(dateStr: string) {
+  return new Date(dateStr).toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -58,7 +58,7 @@ function OutstandingBanner({ isLoading }: { isLoading: boolean }) {
   if (isLoading) return <Skeleton className="h-16 w-full rounded-xl mb-4" />;
   if (!summary) return null;
   const outstanding = summary.totalOutstanding;
-  if (outstanding === 0n) return null;
+  if (outstanding === 0) return null;
   return (
     <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5">
       <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
@@ -86,22 +86,22 @@ function SummaryStrip({ isLoading }: { isLoading: boolean }) {
   const items = [
     {
       label: "Collected",
-      amount: summary?.totalCollected ?? 0n,
+      amount: summary?.totalCollected ?? 0,
       color: "text-emerald-600",
     },
     {
       label: "Outstanding",
-      amount: summary?.totalOutstanding ?? 0n,
+      amount: summary?.totalOutstanding ?? 0,
       color: "text-amber-600",
     },
     {
       label: "Overdue",
-      amount: summary?.totalOverdue ?? 0n,
+      amount: summary?.totalOverdue ?? 0,
       color: "text-destructive",
     },
     {
       label: "Waived",
-      amount: summary?.totalWaived ?? 0n,
+      amount: summary?.totalWaived ?? 0,
       color: "text-muted-foreground",
     },
   ];
@@ -136,10 +136,11 @@ export default function PaymentsPage() {
   const [feeTypeFilter, setFeeTypeFilter] = useState<string>("all");
 
   // Date range defaults: last 90 days
-  const now = BigInt(Date.now()) * 1_000_000n;
-  const ninetyDaysAgo = now - BigInt(90 * 24 * 60 * 60) * 1_000_000_000n;
-  const [fromDate] = useState<bigint>(ninetyDaysAgo);
-  const [toDate] = useState<bigint>(now);
+  const ninetyDaysAgo = new Date();
+  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+  const now = new Date();
+  const [fromDate] = useState<string>(ninetyDaysAgo.toISOString().split('T')[0]);
+  const [toDate] = useState<string>(now.toISOString().split('T')[0]);
 
   const { data: payments, isLoading: paymentsLoading } = usePayments(
     fromDate,

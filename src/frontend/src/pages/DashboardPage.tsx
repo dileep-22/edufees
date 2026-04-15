@@ -31,9 +31,9 @@ import {
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-function calcPercentChange(current: bigint, previous: bigint): number | null {
-  if (previous === 0n) return null;
-  return Math.round(Number(((current - previous) * 10000n) / previous) / 100);
+function calcPercentChange(current: number, previous: number): number | null {
+  if (previous === 0) return null;
+  return Math.round(((current - previous) * 100) / previous);
 }
 
 function formatPercent(pct: number): string {
@@ -43,8 +43,8 @@ function formatPercent(pct: number): string {
 // ── TrendBadge ────────────────────────────────────────────────────────────────
 
 interface TrendBadgeProps {
-  current: bigint;
-  previous: bigint;
+  current: number;
+  previous: number;
   invertColors?: boolean; // true = up is bad (outstanding), false = up is good (collected)
 }
 
@@ -90,7 +90,7 @@ function TrendBadge({
 
 interface SummaryCardProps {
   title: string;
-  amount: bigint;
+  amount: number;
   icon: React.ComponentType<{ className?: string }>;
   iconClass: string;
   isLoading: boolean;

@@ -1,35 +1,45 @@
 export type {
-  FeeStructure,
-  FeeStructureId,
   Student,
-  StudentId,
+  FeeStructure,
   Payment,
-  PaymentId,
-  FeeAssignment,
-  AssignmentId,
-  CollectionSummary,
   StudentBalance,
+  CollectionSummary,
   AgingBucket,
   AgingBucketDetail,
   PaymentMethodBreakdown,
-  CreateFeeStructureInput,
-  UpdateFeeStructureInput,
   CreateStudentInput,
   UpdateStudentInput,
+  CreateFeeStructureInput,
+  UpdateFeeStructureInput,
   RecordPaymentInput,
   CsvStudentRow,
-  LatePenalty,
-  Timestamp,
-  CollectionTrends,
   ImportResult,
   ImportRowError,
-} from "../backend";
-export {
-  FeePeriod,
-  PaymentMethod,
-  PaymentStatus,
-  RecordPaymentError,
-} from "../backend";
+  CollectionTrends,
+} from "../api";
+
+// Re-export enums with string values matching Spring Boot
+export const FeePeriod = {
+  MONTHLY: "MONTHLY",
+  TERM: "TERM",
+  SEMESTER: "SEMESTER",
+  ANNUAL: "ANNUAL",
+} as const;
+
+export const PaymentMethod = {
+  CASH: "CASH",
+  CHECK: "CHECK",
+  TRANSFER: "TRANSFER",
+  ONLINE: "ONLINE",
+} as const;
+
+export const PaymentStatus = {
+  PENDING: "PENDING",
+  PAID: "PAID",
+  OVERDUE: "OVERDUE",
+  PARTIAL: "PARTIAL",
+  WAIVED: "WAIVED",
+} as const;
 
 // Frontend-specific convenience types derived from backend types
 export type CsvImportError = {
@@ -49,13 +59,13 @@ export type AgingDetailItem = {
   studentId: string;
   feeStructureName: string;
   daysOverdue: number;
-  amountDue: bigint;
-  amountPaid: bigint;
+  amountDue: number;
+  amountPaid: number;
 };
 
 export type CollectionTrend = {
-  currentPeriodTotal: bigint;
-  previousPeriodTotal: bigint;
+  currentPeriodTotal: number;
+  previousPeriodTotal: number;
   currentPeriodCount: number;
   previousPeriodCount: number;
 };
